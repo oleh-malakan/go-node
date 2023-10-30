@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	node.Handler("Hello, World!", func(c *node.Connection) {
+	node.Handler("Hello, World!", func(data []byte, c *node.Connection) {
 		b, err := c.Receive()
 		if err != nil {
 			log.Print(err)
