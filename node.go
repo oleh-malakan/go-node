@@ -22,7 +22,7 @@ func (c *Connection) Close() error {
 
 func Handler(nodeID string, f func(query []byte, connection *Connection)) {}
 
-func Do(address *net.UDPAddr, nodeAddress ...*net.UDPAddr) error {
+func Do(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
 	return nil
 }
 
