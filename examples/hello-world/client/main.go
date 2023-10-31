@@ -13,7 +13,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	conn, err := client.Connect("Hello, World!", nil)
+	conn, err := client.Query("Hello, World!", nil)
 	if err != nil {
 		log.Print(err)
 

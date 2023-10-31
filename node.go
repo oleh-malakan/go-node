@@ -1,6 +1,6 @@
 package node
 
-func Handler(connectionID string, f func(data []byte, connection *Connection)) {}
+func Handler(nodeID string, f func(queryData []byte, connection *Connection)) {}
 
 func ListenAndServe() error {
 	return nil
@@ -8,7 +8,7 @@ func ListenAndServe() error {
 
 type Client struct{}
 
-func (c *Client) Connect(connectionID string, data []byte) (*Connection, error) {
+func (c *Client) Query(nodeID string, queryData []byte) (*Connection, error) {
 	return &Connection{}, nil
 }
 
