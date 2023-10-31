@@ -2,22 +2,23 @@ package main
 
 import (
 	"log"
+	"net"
 
 	"github.com/oleh-malakan/go-node"
 )
 
 func main() {
-	node.Handler("Hello, World!", func(queryData []byte, c *node.Connection) {
-		b, err := c.Receive()
+	node.Handler("Hello, World!", func(query []byte, connection *node.Connection) {
+		b, err := connection.Receive()
 		if err != nil {
 			log.Print(err)
 
 			return
 		}
 
-		msg := string(b)
-		if msg == "Hello" {
-			if err := c.Send([]byte(msg + ", World!")); err != nil {
+		message := string(b)
+		if message == "Hello" {
+			if err := connection.Send([]byte(message + ", World!")); err != nil {
 				log.Print(err)
 
 				return
@@ -25,5 +26,5 @@ func main() {
 		}
 	})
 
-	log.Fatal(node.ListenAndServe())
+	log.Fatal(node.Do(&net.UDPAddr{}))
 }

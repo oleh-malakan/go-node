@@ -3,30 +3,31 @@ package main
 import (
 	"fmt"
 	"log"
+	"net"
 
 	"github.com/oleh-malakan/go-node"
 )
 
 func main() {
-	client, err := node.Dial()
+	client, err := node.Dial(&net.UDPAddr{})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	conn, err := client.Query("Hello, World!", nil)
+	connection, err := client.Connect("Hello, World!", nil)
 	if err != nil {
 		log.Print(err)
 
 		return
 	}
-
-	if err := conn.Send([]byte("Hello")); err != nil {
+	
+	if err := connection.Send([]byte("Hello")); err != nil {
 		log.Print(err)
 
 		return
 	}
 
-	b, err := conn.Receive()
+	b, err := connection.Receive()
 	if err != nil {
 		log.Print(err)
 
@@ -34,7 +35,7 @@ func main() {
 	}
 	fmt.Println(string(b))
 
-	if err := conn.Close(); err != nil {
+	if err := connection.Close(); err != nil {
 		log.Print(err)
 
 		return
