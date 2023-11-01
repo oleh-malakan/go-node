@@ -1,53 +1,33 @@
 package node
 
 import (
-	"crypto/tls"
-	"errors"
+	"crypto/sha256"
 	"net"
 )
 
-type Connection struct{}
+func Handler(nodeID string, f func(query []byte, connection *Connection)) {
+	handler := &handler{
+		nodeID: sha256.Sum256([]byte(nodeID)),
+		f:      f,
+	}
 
-func (c *Connection) Send(b []byte) error {
-	return nil
+	initHandlers = append(initHandlers, handler)
 }
-
-func (c *Connection) Receive() ([]byte, error) {
-	return nil, nil
-}
-
-func (c *Connection) Close() error {
-	return nil
-}
-
-func Handler(nodeID string, f func(query []byte, connection *Connection)) {}
 
 func Do(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
+	handlers = make([]*handler, len(initHandlers))
+	copy(handlers, initHandlers)
+	initHandlers = nil
+
 	return nil
 }
 
-func DoTLS(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
-	return nil
+type handler struct {
+	nodeID [32]byte
+	f      func(query []byte, connection *Connection)
 }
 
-type Client struct{}
-
-func (c *Client) Connect(nodeID string, query []byte) (*Connection, error) {
-	return &Connection{}, nil
-}
-
-func Dial(nodeAddresses ...*net.UDPAddr) (*Client, error) {
-	if len(nodeAddresses) == 0 {
-		return nil, errors.New("node address not specified")
-	}
-
-	return &Client{}, nil
-}
-
-func DialTLS(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Client, error) {
-	if len(nodeAddresses) == 0 {
-		return nil, errors.New("node address not specified")
-	}
-
-	return &Client{}, nil
-}
+var (
+	initHandlers []*handler
+	handlers     []*handler
+)
