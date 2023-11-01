@@ -2,13 +2,17 @@ package node
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"net"
 )
 
 func Handler(nodeID string, f func(query []byte, connection *Connection)) {
+	b := sha256.Sum256([]byte(nodeID))
 	handler := &handler{
-		nodeID: sha256.Sum256([]byte(nodeID)),
 		f:      f,
+	}
+	for i := 0; i < 4; i++ {
+		handler.nodeID[i] = binary.LittleEndian.Uint64(b[i * 8: i * 8 + 8])
 	}
 
 	initHandlers = append(initHandlers, handler)
@@ -23,7 +27,7 @@ func Do(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
 }
 
 type handler struct {
-	nodeID [32]byte
+	nodeID [4]uint64
 	f      func(query []byte, connection *Connection)
 }
 
