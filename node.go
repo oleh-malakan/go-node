@@ -9,11 +9,12 @@ import (
 func Handler(nodeID string, f func(query []byte, connection *Connection)) {
 	b := sha256.Sum256([]byte(nodeID))
 	handler := &handler{
-		f:      f,
+		f: f,
 	}
-	for i := 0; i < 4; i++ {
-		handler.nodeID[i] = binary.LittleEndian.Uint64(b[i * 8: i * 8 + 8])
-	}
+	handler.nodeID[0] = binary.LittleEndian.Uint64(b[:8])
+	handler.nodeID[1] = binary.LittleEndian.Uint64(b[8:16])
+	handler.nodeID[2] = binary.LittleEndian.Uint64(b[16:24])
+	handler.nodeID[3] = binary.LittleEndian.Uint64(b[24:])
 
 	initHandlers = append(initHandlers, handler)
 }
