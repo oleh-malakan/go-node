@@ -50,24 +50,27 @@ func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr
 		return err
 	}
 
-	type client struct {
+	type tClient struct {
 		rAddr *net.UDPAddr
 		cids  [][4]uint64
 	}
-	memory := struct {
-		clients []*client
+	type tMemory struct {
+		clients []*tClient
 		index   []int
 		free    chan int
-	}{
+	}
+	memory := tMemory {
 		free: make(chan int, 512),
 	}
-
+	tmpMemory := tMemory {
+		free: make(chan int, 32),
+	}
 
 	for {
 		b := make([]byte, 560)
 		n, rAddr, err := conn.ReadFromUDP(b)
 
-		var cli *client
+		var cli *tClient
 		for i := 0; i < len(memory.clients); i++ {
 			cli = memory.clients[memory.index[i]]
 			if cli.rAddr.IP.Equal(rAddr.IP) && cli.rAddr.Port == rAddr.Port {
