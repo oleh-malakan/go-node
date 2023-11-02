@@ -50,10 +50,18 @@ func (c *Client) dial(nodeAddresses ...*net.UDPAddr) {
 		}
 	}()
 
-	go c.runRead()
-	go c.runWrite()
+	c.runRead()
+	c.runWrite()
 }
 
-func (c *Client) runRead() {}
+func (c *Client) runRead() {
+	go func() {
 
-func (c *Client) runWrite() {}
+	}()
+}
+
+func (c *Client) runWrite() {
+	go func() {
+
+	}()
+}

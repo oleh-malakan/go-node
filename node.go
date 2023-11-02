@@ -20,15 +20,14 @@ func Handler(nodeID string, f func(query []byte, connection *Connection)) {
 	h.nodeID[3] = uint64(b[24]) | uint64(b[25])<<8 | uint64(b[26])<<16 | uint64(b[27])<<24 |
 		uint64(b[28])<<32 | uint64(b[29])<<40 | uint64(b[30])<<48 | uint64(b[31])<<56
 
-	initHandlers = append(initHandlers, h)
+	handlers = append(handlers, h)
 }
 
 func Do(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
-	handlers = make([]*handler, len(initHandlers))
-	copy(handlers, initHandlers)
-	initHandlers = nil
-
-	return nil
+	lock <- struct{}{}
+	err := do(handlers, address, nodeAddresses...)
+	<-lock
+	return err
 }
 
 type handler struct {
@@ -37,6 +36,48 @@ type handler struct {
 }
 
 var (
-	initHandlers []*handler
-	handlers     []*handler
+	handlers []*handler
+	lock     chan struct{}
 )
+
+func init() {
+	lock = make(chan struct{}, 1)
+}
+
+func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
+	conn, err := net.ListenUDP("udp", address)
+	if err != nil {
+		return err
+	}
+
+	type client struct {
+		rAddr *net.UDPAddr
+		cids  [][4]uint64
+	}
+	memory := struct {
+		clients []*client
+		index   []int
+		free    chan int
+	}{
+		free: make(chan int, 512),
+	}
+
+
+	for {
+		b := make([]byte, 560)
+		n, rAddr, err := conn.ReadFromUDP(b)
+
+		var cli *client
+		for i := 0; i < len(memory.clients); i++ {
+			cli = memory.clients[memory.index[i]]
+			if cli.rAddr.IP.Equal(rAddr.IP) && cli.rAddr.Port == rAddr.Port {
+				break
+			}
+			cli = nil
+		}
+		if cli == nil {
+
+		}
+
+	}
+}

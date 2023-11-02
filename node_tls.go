@@ -6,6 +6,9 @@ import (
 )
 
 func DoTLS(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
+	lock <- struct{}{}
 
+	<-lock
 	return nil
+
 }
