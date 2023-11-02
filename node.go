@@ -78,12 +78,11 @@ func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr
 	}
 
 	go func() {
+		
 		var cli *tClient
 		for i := 0; i < len(memory.clients); i++ {
 			cli = memory.clients[memory.index[i]]
-			if cli.rAddr.IP.Equal(rAddr.IP) && cli.rAddr.Port == rAddr.Port {
-				break
-			}
+
 			cli = nil
 		}
 		if cli == nil {
