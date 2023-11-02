@@ -55,9 +55,9 @@ func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr
 		cids  [][4]uint64
 	}
 	type tMemory struct {
-		clients []*tClient
-		index   []int
-		free    []int
+		clients   []*tClient
+		index     []int
+		freeIndex []int
 	}
 	memory := tMemory{}
 	tmpMemory := tMemory{}
