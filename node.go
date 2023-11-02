@@ -71,14 +71,25 @@ func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr
 	}
 
 	go func() {
-		var client *tClient
-		for i := 0; i < len(memory); i++ {
-			client = memory[i]
+		var readData *tReadData
+		for {
+			select {
+			case readData = <-cReadData:
+				if readData.err != nil {
 
-			client = nil
-		}
-		if client == nil {
+				}
+				var client *tClient
+				for i := 0; i < len(memory); i++ {
+					client = memory[i]
 
+					client = nil
+				}
+				if client == nil {
+
+				}
+
+				cFreeReadData <- readData
+			}
 		}
 	}()
 
