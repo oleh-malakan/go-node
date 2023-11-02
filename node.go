@@ -45,6 +45,7 @@ func init() {
 }
 
 func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
+
 	conn, err := net.ListenUDP("udp", address)
 	if err != nil {
 		return err
@@ -62,10 +63,22 @@ func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr
 	memory := tMemory{}
 	tmpMemory := tMemory{}
 
-	for {
-		b := make([]byte, 560)
-		n, rAddr, err := conn.ReadFromUDP(b)
+	type tReadData struct {
+		b     []byte
+		n     int
+		rAddr *net.UDPAddr
+		err   error
+	}
 
+	cReadData := make(chan *tReadData, 512)
+	cFreeReadData := make(chan *tReadData, 512)
+	for i := 0; i < 512; i++ {
+		cFreeReadData <- &tReadData{
+			b: make([]byte, 560),
+		}
+	}
+
+	go func() {
 		var cli *tClient
 		for i := 0; i < len(memory.clients); i++ {
 			cli = memory.clients[memory.index[i]]
@@ -77,6 +90,12 @@ func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr
 		if cli == nil {
 
 		}
+	}()
 
+	var readData *tReadData
+	for {
+		readData = <-cFreeReadData
+		readData.n, readData.rAddr, readData.err = conn.ReadFromUDP(readData.b)
+		cReadData <- readData
 	}
 }
