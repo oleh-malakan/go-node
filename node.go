@@ -78,16 +78,9 @@ func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr
 				if readData.err != nil {
 
 				}
-				var client *tClient
 				for i := 0; i < len(memory); i++ {
-					client = memory[i]
-
-					client = nil
 				}
-				if client == nil {
-
-				}
-
+				
 				cFreeReadData <- readData
 			}
 		}

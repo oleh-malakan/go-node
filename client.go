@@ -6,10 +6,7 @@ import (
 )
 
 type Client struct {
-	cConn        chan *net.UDPConn
-	cReadConnErr chan error
-
-	cErr chan error
+	conn *net.UDPConn
 }
 
 func (c *Client) Connect(nodeID string, query []byte) (*Connection, error) {
@@ -22,36 +19,24 @@ func Dial(nodeAddresses ...*net.UDPAddr) (*Client, error) {
 	}
 
 	client := &Client{}
-	client.dial(nodeAddresses...)
+	err := client.dial(nodeAddresses...)
+	if err != nil {
+		return nil, err
+	}
 
 	return client, nil
 }
 
-func (c *Client) dial(nodeAddresses ...*net.UDPAddr) {
-	c.cConn = make(chan *net.UDPConn)
-	c.cReadConnErr = make(chan error)
-
-	go func() {
-		var conn *net.UDPConn
-	NEW:
-		var err error
-		conn, err = net.DialUDP("udp", nil, nodeAddresses[0])
-		if err != nil {
-			c.cErr <- err
-			goto NEW
-		}
-
-		for {
-			select {
-			case c.cConn <- conn:
-			case <-c.cReadConnErr:
-				goto NEW
-			}
-		}
-	}()
+func (c *Client) dial(nodeAddresses ...*net.UDPAddr) (err error) {	
+	c.conn, err = net.DialUDP("udp", nil, nodeAddresses[0])
+	if err != nil {
+		return
+	}
 
 	c.runRead()
 	c.runWrite()
+
+	return
 }
 
 func (c *Client) runRead() {
