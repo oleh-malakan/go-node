@@ -57,14 +57,10 @@ func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr
 	type tMemory struct {
 		clients []*tClient
 		index   []int
-		free    chan int
+		free    []int
 	}
-	memory := tMemory {
-		free: make(chan int, 512),
-	}
-	tmpMemory := tMemory {
-		free: make(chan int, 32),
-	}
+	memory := tMemory{}
+	tmpMemory := tMemory{}
 
 	for {
 		b := make([]byte, 560)
