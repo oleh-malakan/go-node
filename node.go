@@ -61,7 +61,6 @@ func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr
 		freeIndex []int
 	}
 	memory := tMemory{}
-	tmpMemory := tMemory{}
 
 	type tReadData struct {
 		b     []byte
