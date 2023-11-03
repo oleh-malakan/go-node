@@ -11,13 +11,13 @@ func Handler(nodeID string, f func(query []byte, connection *Connection)) {
 		f: f,
 	}
 	_ = b[31]
-	h.nodeID[0] = uint64(b[0]) | uint64(b[1])<<8 | uint64(b[2])<<16 | uint64(b[3])<<24 |
+	h.nodeID.p1 = uint64(b[0]) | uint64(b[1])<<8 | uint64(b[2])<<16 | uint64(b[3])<<24 |
 		uint64(b[4])<<32 | uint64(b[5])<<40 | uint64(b[6])<<48 | uint64(b[7])<<56
-	h.nodeID[1] = uint64(b[8]) | uint64(b[9])<<8 | uint64(b[10])<<16 | uint64(b[11])<<24 |
+	h.nodeID.p2 = uint64(b[8]) | uint64(b[9])<<8 | uint64(b[10])<<16 | uint64(b[11])<<24 |
 		uint64(b[12])<<32 | uint64(b[13])<<40 | uint64(b[14])<<48 | uint64(b[15])<<56
-	h.nodeID[2] = uint64(b[16]) | uint64(b[17])<<8 | uint64(b[18])<<16 | uint64(b[19])<<24 |
+	h.nodeID.p3 = uint64(b[16]) | uint64(b[17])<<8 | uint64(b[18])<<16 | uint64(b[19])<<24 |
 		uint64(b[20])<<32 | uint64(b[21])<<40 | uint64(b[22])<<48 | uint64(b[23])<<56
-	h.nodeID[3] = uint64(b[24]) | uint64(b[25])<<8 | uint64(b[26])<<16 | uint64(b[27])<<24 |
+	h.nodeID.p4 = uint64(b[24]) | uint64(b[25])<<8 | uint64(b[26])<<16 | uint64(b[27])<<24 |
 		uint64(b[28])<<32 | uint64(b[29])<<40 | uint64(b[30])<<48 | uint64(b[31])<<56
 
 	handlers = append(handlers, h)
@@ -31,8 +31,15 @@ func Do(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
 }
 
 type handler struct {
-	nodeID [4]uint64
+	nodeID tID
 	f      func(query []byte, connection *Connection)
+}
+
+type tID struct {
+	p1 uint64
+	p2 uint64
+	p3 uint64
+	p4 uint64
 }
 
 var (
@@ -52,7 +59,7 @@ func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr
 
 	type tClient struct {
 		rAddr *net.UDPAddr
-		cids  [][4]uint64
+		cids  []tID
 	}
 	var memory []*tClient
 
@@ -66,7 +73,7 @@ func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr
 	cFreeReadData := make(chan *tReadData, 512)
 	for i := 0; i < 512; i++ {
 		cFreeReadData <- &tReadData{
-			b: make([]byte, 560),
+			b: make([]byte, 1432),
 		}
 	}
 
@@ -80,7 +87,7 @@ func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr
 				}
 				for i := 0; i < len(memory); i++ {
 				}
-				
+
 				cFreeReadData <- readData
 			}
 		}
