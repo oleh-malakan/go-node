@@ -71,22 +71,68 @@ func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr
 	}
 	cReadData := make(chan *tReadData, 512)
 	cFreeReadData := make(chan *tReadData, 512)
-	for i := 0; i < 512; i++ {
+	var i int
+	for i = 0; i < 512; i++ {
 		cFreeReadData <- &tReadData{
 			b: make([]byte, 1432),
 		}
 	}
 
 	go func() {
-		var readData *tReadData
+		var (
+			i           int
+			readData    *tReadData
+			cid         tID
+			client      *tClient
+			clientIndex int
+			iteration   int
+		)
+		lenMemory := len(memory)
+
 		for {
 			select {
 			case readData = <-cReadData:
 				if readData.err != nil {
 
 				}
-				for i := 0; i < len(memory); i++ {
+				cid = tID{}
+				client = nil
+				clientIndex = -1
+				iteration = 0
+				cClientIndex := make(chan int, lenMemory)
+				for i = 0; i < lenMemory && clientIndex < 0; i++ {
+					go func(index int) {
+						j := len(memory[index].cids)
+						for j > 0 {
+							j--
+							if memory[index].cids[j].p1 == cid.p1 && memory[index].cids[j].p2 == cid.p2 &&
+								memory[index].cids[j].p3 == cid.p3 && memory[index].cids[j].p4 == cid.p4 {
+								cClientIndex <- index
+								return
+							}
+						}
+						cClientIndex <- -1
+					}(i)
+
+					select {
+					case clientIndex = <-cClientIndex:
+						iteration++
+					default:
+					}
 				}
+
+				for clientIndex < 0 && iteration < lenMemory {
+					select {
+					case clientIndex = <-cClientIndex:
+						iteration++
+					}
+				}
+
+				if clientIndex < 0 {
+
+				}
+
+				client = memory[clientIndex]
 
 				cFreeReadData <- readData
 			}
