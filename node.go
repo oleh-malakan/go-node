@@ -100,7 +100,7 @@ func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr
 				clientIndex = -1
 				iteration = 0
 				cClientIndex := make(chan int, lenMemory)
-				for i = 0; i < lenMemory && clientIndex < 0; i++ {
+				for i = 0; i < lenMemory; i++ {
 					go func(index int) {
 						j := len(memory[index].cids)
 						for j > 0 {
@@ -113,17 +113,14 @@ func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr
 						}
 						cClientIndex <- -1
 					}(i)
-
-					select {
-					case clientIndex = <-cClientIndex:
-						iteration++
-					default:
-					}
 				}
 
-				for clientIndex < 0 && iteration < lenMemory {
+				for iteration < lenMemory {
 					select {
-					case clientIndex = <-cClientIndex:
+					case i = <-cClientIndex:
+						if i >= 0 {
+							clientIndex = i
+						}
 						iteration++
 					}
 				}
