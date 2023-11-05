@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"log"
 	"net"
 
@@ -26,5 +27,5 @@ func main() {
 		}
 	})
 
-	log.Fatal(node.Do(&net.UDPAddr{}))
+	log.Fatal(node.Do(&tls.Config{}, &net.UDPAddr{}))
 }

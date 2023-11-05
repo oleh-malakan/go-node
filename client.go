@@ -1,6 +1,7 @@
 package node
 
 import (
+	"crypto/tls"
 	"errors"
 	"net"
 )
@@ -11,13 +12,13 @@ func (c *Client) Connect(nodeID string, query []byte) (*Connection, error) {
 	return &Connection{}, nil
 }
 
-func Dial(nodeAddresses ...*net.UDPAddr) (*Client, error) {
+func Dial(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Client, error) {
 	if len(nodeAddresses) == 0 {
 		return nil, errors.New("node address not specified")
 	}
 
 	client := &Client{}
-	err := client.dial(nodeAddresses...)
+	err := client.dial(tlsConfig, nodeAddresses...)
 	if err != nil {
 		return nil, err
 	}
@@ -25,7 +26,7 @@ func Dial(nodeAddresses ...*net.UDPAddr) (*Client, error) {
 	return client, nil
 }
 
-func (c *Client) dial(nodeAddresses ...*net.UDPAddr) error {
+func (c *Client) dial(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) error {
 	conn, err := net.DialUDP("udp", nil, nodeAddresses[0])
 	if err != nil {
 		return err

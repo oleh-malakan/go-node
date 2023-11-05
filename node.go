@@ -2,6 +2,7 @@ package node
 
 import (
 	"crypto/sha256"
+	"crypto/tls"
 	"net"
 )
 
@@ -23,9 +24,9 @@ func Handler(nodeID string, f func(query []byte, connection *Connection)) {
 	handlers = append(handlers, h)
 }
 
-func Do(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
+func Do(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
 	lock <- struct{}{}
-	err := do(handlers, address, nodeAddresses...)
+	err := do(tlsConfig, handlers, address, nodeAddresses...)
 	<-lock
 	return err
 }
@@ -51,7 +52,7 @@ func init() {
 	lock = make(chan struct{}, 1)
 }
 
-func do(handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
+func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
 	conn, err := net.ListenUDP("udp", address)
 	if err != nil {
 		return err
