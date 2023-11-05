@@ -80,13 +80,18 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 		readed       int
 		writeData    *tWriteData
 		writeLastMac tID
+		next         *tClient
 	}
-	var memory []*tClient
+	var (
+		memory        *tClient
+		lastMemory    *tClient
+		currentMemory *tClient
+		lenMemory     int
+	)
 
 	cReadData := make(chan *tReadData, 512)
 	cFreeReadData := make(chan *tReadData, 512)
-	var i int
-	for i = 0; i < 512; i++ {
+	for i := 0; i < 512; i++ {
 		cFreeReadData <- &tReadData{
 			b: make([]byte, 1432),
 		}
@@ -94,15 +99,13 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 
 	go func() {
 		var (
-			i           int
 			readData    *tReadData
 			cid         tID
 			client      *tClient
-			clientIndex int
+			clientFound *tClient
 			iteration   int
 			bs          [32]byte
 		)
-		lenMemory := len(memory)
 
 		for {
 			select {
@@ -124,8 +127,14 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 					readData.nextMac.p4 = uint64(bs[24]) | uint64(bs[25])<<8 | uint64(bs[26])<<16 | uint64(bs[27])<<24 |
 						uint64(bs[28])<<32 | uint64(bs[29])<<40 | uint64(bs[30])<<48 | uint64(bs[31])<<56
 					client.readData = readData
-					memory = append(memory, client)
-					lenMemory = len(memory)
+					if memory != nil {
+						lastMemory.next = client
+						lastMemory = client
+					} else {
+						memory = client
+						lastMemory = client
+					}
+					lenMemory++
 				case readData.b[0]&0b10000000 == 0b10000000:
 					cid.p1 = uint64(readData.b[1]) | uint64(readData.b[2])<<8 | uint64(readData.b[3])<<16 | uint64(readData.b[4])<<24 |
 						uint64(readData.b[5])<<32 | uint64(readData.b[6])<<40 | uint64(readData.b[7])<<48 | uint64(readData.b[8])<<56
@@ -153,18 +162,16 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 					readData.nextMac.p4 = uint64(bs[24]) | uint64(bs[25])<<8 | uint64(bs[26])<<16 | uint64(bs[27])<<24 |
 						uint64(bs[28])<<32 | uint64(bs[29])<<40 | uint64(bs[30])<<48 | uint64(bs[31])<<56
 
-					client = nil
-					clientIndex = -1
-					iteration = 0
-					cClientIndex := make(chan int, lenMemory)
-					for i = 0; i < lenMemory; i++ {
-						go func(index int) {
+					currentMemory = memory
+					cClient := make(chan *tClient, lenMemory)
+					for currentMemory != nil {
+						go func(c *tClient) {
 							w := client.writeData
 							m := client.writeLastMac
-							LOOP:
+						LOOP:
 							if m.p1 == cid.p1 && m.p2 == cid.p2 &&
 								m.p3 == cid.p3 && m.p4 == cid.p4 {
-								cClientIndex <- index
+								cClient <- c
 								return
 							}
 							if w != nil && w.prev != nil {
@@ -172,25 +179,27 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 								m = w.mac
 								goto LOOP
 							}
-							cClientIndex <- -1
-						}(i)
+							cClient <- nil
+						}(currentMemory)
+
+						currentMemory = currentMemory.next
 					}
 
+					client = nil
+					iteration = 0
 					for iteration < lenMemory {
 						select {
-						case i = <-cClientIndex:
-							if i >= 0 {
-								clientIndex = i
+						case clientFound = <-cClient:
+							if clientFound != nil {
+								client = clientFound
 							}
 							iteration++
 						}
 					}
 
-					if clientIndex < 0 {
+					if client == nil {
 
 					}
-
-					client = memory[clientIndex]
 
 				default:
 					cFreeReadData <- readData
