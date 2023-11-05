@@ -74,10 +74,12 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 		prev    *tWriteData
 	}
 	type tClient struct {
-		rAddr     *net.UDPAddr
-		readData  *tReadData
-		readed    int
-		writeData *tWriteData
+		rAddr        *net.UDPAddr
+		readData     *tReadData
+		readNextMac  tID
+		readed       int
+		writeData    *tWriteData
+		writeLastMac tID
 	}
 	var memory []*tClient
 
@@ -158,15 +160,17 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 					for i = 0; i < lenMemory; i++ {
 						go func(index int) {
 							w := client.writeData
-							for w.prev != nil {
-								if memory[index].writeData.mac.p1 == cid.p1 && memory[index].writeData.mac.p2 == cid.p2 &&
-									memory[index].writeData.mac.p3 == cid.p3 && memory[index].writeData.mac.p4 == cid.p4 {
-									cClientIndex <- index
-									return
-								}
-								if w.prev != nil {
-									w = w.prev
-								}
+							m := client.writeLastMac
+							LOOP:
+							if m.p1 == cid.p1 && m.p2 == cid.p2 &&
+								m.p3 == cid.p3 && m.p4 == cid.p4 {
+								cClientIndex <- index
+								return
+							}
+							if w != nil && w.prev != nil {
+								w = w.prev
+								m = w.mac
+								goto LOOP
 							}
 							cClientIndex <- -1
 						}(i)
