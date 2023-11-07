@@ -84,7 +84,6 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 	}
 	var (
 		memory        *tClient
-		lastMemory    *tClient
 		currentMemory *tClient
 		lenMemory     int
 	)
@@ -128,11 +127,10 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 						uint64(bs[28])<<32 | uint64(bs[29])<<40 | uint64(bs[30])<<48 | uint64(bs[31])<<56
 					client.readData = readData
 					if memory != nil {
-						lastMemory.next = client
-						lastMemory = client
+						client.next = memory
+						memory = client
 					} else {
 						memory = client
-						lastMemory = client
 					}
 					lenMemory++
 				case readData.b[0]&0b10000000 == 0b10000000:
