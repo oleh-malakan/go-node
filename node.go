@@ -73,20 +73,6 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 		mac     tID
 		prev    *tWriteData
 	}
-	type tClient struct {
-		rAddr        *net.UDPAddr
-		readData     *tReadData
-		readNextMac  tID
-		readed       int
-		writeData    *tWriteData
-		writeLastMac tID
-		next         *tClient
-	}
-	var (
-		memory        *tClient
-		currentMemory *tClient
-		lenMemory     int
-	)
 
 	cReadData := make(chan *tReadData, 512)
 	cFreeReadData := make(chan *tReadData, 512)
@@ -97,14 +83,49 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 	}
 
 	go func() {
+		type tClient struct {
+			rAddr        *net.UDPAddr
+			readData     *tReadData
+			readNextMac  tID
+			readed       int
+			writeData    *tWriteData
+			writeLastMac tID
+			next         *tClient
+		}
+
 		var (
+			memory      *tClient
+			lenMemory   int
+			cClient     chan *tClient
 			readData    *tReadData
 			cid         tID
 			client      *tClient
-			clientFound *tClient
+			foundClient *tClient
+			bypass      func(c *tClient)
 			iteration   int
-			bs          [32]byte
+			bNextMac    [32]byte
 		)
+
+		bypass = func(c *tClient) {
+			if c.next != nil {
+				go bypass(c.next)
+			}
+
+			w := c.writeData
+			m := c.writeLastMac
+		LOOP:
+			if m.p1 == cid.p1 && m.p2 == cid.p2 &&
+				m.p3 == cid.p3 && m.p4 == cid.p4 {
+				cClient <- c
+				return
+			}
+			if w != nil && w.prev != nil {
+				w = w.prev
+				m = w.mac
+				goto LOOP
+			}
+			cClient <- nil
+		}
 
 		for {
 			select {
@@ -116,15 +137,15 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 				switch {
 				case readData.b[0]&0b00000000 == 0b00000000:
 					client = &tClient{}
-					bs = sha256.Sum256(readData.b[1:readData.n])
-					readData.nextMac.p1 = uint64(bs[0]) | uint64(bs[1])<<8 | uint64(bs[2])<<16 | uint64(bs[3])<<24 |
-						uint64(bs[4])<<32 | uint64(bs[5])<<40 | uint64(bs[6])<<48 | uint64(bs[7])<<56
-					readData.nextMac.p2 = uint64(bs[8]) | uint64(bs[9])<<8 | uint64(bs[10])<<16 | uint64(bs[11])<<24 |
-						uint64(bs[12])<<32 | uint64(bs[13])<<40 | uint64(bs[14])<<48 | uint64(bs[15])<<56
-					readData.nextMac.p3 = uint64(bs[16]) | uint64(bs[17])<<8 | uint64(bs[18])<<16 | uint64(bs[19])<<24 |
-						uint64(bs[20])<<32 | uint64(bs[21])<<40 | uint64(bs[22])<<48 | uint64(bs[23])<<56
-					readData.nextMac.p4 = uint64(bs[24]) | uint64(bs[25])<<8 | uint64(bs[26])<<16 | uint64(bs[27])<<24 |
-						uint64(bs[28])<<32 | uint64(bs[29])<<40 | uint64(bs[30])<<48 | uint64(bs[31])<<56
+					bNextMac = sha256.Sum256(readData.b[1:readData.n])
+					readData.nextMac.p1 = uint64(bNextMac[0]) | uint64(bNextMac[1])<<8 | uint64(bNextMac[2])<<16 | uint64(bNextMac[3])<<24 |
+						uint64(bNextMac[4])<<32 | uint64(bNextMac[5])<<40 | uint64(bNextMac[6])<<48 | uint64(bNextMac[7])<<56
+					readData.nextMac.p2 = uint64(bNextMac[8]) | uint64(bNextMac[9])<<8 | uint64(bNextMac[10])<<16 | uint64(bNextMac[11])<<24 |
+						uint64(bNextMac[12])<<32 | uint64(bNextMac[13])<<40 | uint64(bNextMac[14])<<48 | uint64(bNextMac[15])<<56
+					readData.nextMac.p3 = uint64(bNextMac[16]) | uint64(bNextMac[17])<<8 | uint64(bNextMac[18])<<16 | uint64(bNextMac[19])<<24 |
+						uint64(bNextMac[20])<<32 | uint64(bNextMac[21])<<40 | uint64(bNextMac[22])<<48 | uint64(bNextMac[23])<<56
+					readData.nextMac.p4 = uint64(bNextMac[24]) | uint64(bNextMac[25])<<8 | uint64(bNextMac[26])<<16 | uint64(bNextMac[27])<<24 |
+						uint64(bNextMac[28])<<32 | uint64(bNextMac[29])<<40 | uint64(bNextMac[30])<<48 | uint64(bNextMac[31])<<56
 					client.readData = readData
 					if memory != nil {
 						client.next = memory
@@ -133,7 +154,8 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 						memory = client
 					}
 					lenMemory++
-				case readData.b[0]&0b10000000 == 0b10000000:
+					cClient = make(chan *tClient, lenMemory)
+				case readData.b[0]&0b10000000 == 0b10000000 && memory != nil:
 					cid.p1 = uint64(readData.b[1]) | uint64(readData.b[2])<<8 | uint64(readData.b[3])<<16 | uint64(readData.b[4])<<24 |
 						uint64(readData.b[5])<<32 | uint64(readData.b[6])<<40 | uint64(readData.b[7])<<48 | uint64(readData.b[8])<<56
 					cid.p2 = uint64(readData.b[9]) | uint64(readData.b[10])<<8 | uint64(readData.b[11])<<16 | uint64(readData.b[12])<<24 |
@@ -150,46 +172,25 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 						uint64(readData.b[53])<<32 | uint64(readData.b[54])<<40 | uint64(readData.b[55])<<48 | uint64(readData.b[56])<<56
 					readData.mac.p4 = uint64(readData.b[57]) | uint64(readData.b[58])<<8 | uint64(readData.b[59])<<16 | uint64(readData.b[60])<<24 |
 						uint64(readData.b[61])<<32 | uint64(readData.b[62])<<40 | uint64(readData.b[63])<<48 | uint64(readData.b[64])<<56
-					bs = sha256.Sum256(readData.b[65:readData.n])
-					readData.nextMac.p1 = uint64(bs[0]) | uint64(bs[1])<<8 | uint64(bs[2])<<16 | uint64(bs[3])<<24 |
-						uint64(bs[4])<<32 | uint64(bs[5])<<40 | uint64(bs[6])<<48 | uint64(bs[7])<<56
-					readData.nextMac.p2 = uint64(bs[8]) | uint64(bs[9])<<8 | uint64(bs[10])<<16 | uint64(bs[11])<<24 |
-						uint64(bs[12])<<32 | uint64(bs[13])<<40 | uint64(bs[14])<<48 | uint64(bs[15])<<56
-					readData.nextMac.p3 = uint64(bs[16]) | uint64(bs[17])<<8 | uint64(bs[18])<<16 | uint64(bs[19])<<24 |
-						uint64(bs[20])<<32 | uint64(bs[21])<<40 | uint64(bs[22])<<48 | uint64(bs[23])<<56
-					readData.nextMac.p4 = uint64(bs[24]) | uint64(bs[25])<<8 | uint64(bs[26])<<16 | uint64(bs[27])<<24 |
-						uint64(bs[28])<<32 | uint64(bs[29])<<40 | uint64(bs[30])<<48 | uint64(bs[31])<<56
+					bNextMac = sha256.Sum256(readData.b[65:readData.n])
+					readData.nextMac.p1 = uint64(bNextMac[0]) | uint64(bNextMac[1])<<8 | uint64(bNextMac[2])<<16 | uint64(bNextMac[3])<<24 |
+						uint64(bNextMac[4])<<32 | uint64(bNextMac[5])<<40 | uint64(bNextMac[6])<<48 | uint64(bNextMac[7])<<56
+					readData.nextMac.p2 = uint64(bNextMac[8]) | uint64(bNextMac[9])<<8 | uint64(bNextMac[10])<<16 | uint64(bNextMac[11])<<24 |
+						uint64(bNextMac[12])<<32 | uint64(bNextMac[13])<<40 | uint64(bNextMac[14])<<48 | uint64(bNextMac[15])<<56
+					readData.nextMac.p3 = uint64(bNextMac[16]) | uint64(bNextMac[17])<<8 | uint64(bNextMac[18])<<16 | uint64(bNextMac[19])<<24 |
+						uint64(bNextMac[20])<<32 | uint64(bNextMac[21])<<40 | uint64(bNextMac[22])<<48 | uint64(bNextMac[23])<<56
+					readData.nextMac.p4 = uint64(bNextMac[24]) | uint64(bNextMac[25])<<8 | uint64(bNextMac[26])<<16 | uint64(bNextMac[27])<<24 |
+						uint64(bNextMac[28])<<32 | uint64(bNextMac[29])<<40 | uint64(bNextMac[30])<<48 | uint64(bNextMac[31])<<56
 
-					currentMemory = memory
-					cClient := make(chan *tClient, lenMemory)
-					for currentMemory != nil {
-						go func(c *tClient) {
-							w := client.writeData
-							m := client.writeLastMac
-						LOOP:
-							if m.p1 == cid.p1 && m.p2 == cid.p2 &&
-								m.p3 == cid.p3 && m.p4 == cid.p4 {
-								cClient <- c
-								return
-							}
-							if w != nil && w.prev != nil {
-								w = w.prev
-								m = w.mac
-								goto LOOP
-							}
-							cClient <- nil
-						}(currentMemory)
-
-						currentMemory = currentMemory.next
-					}
+					go bypass(memory)
 
 					client = nil
 					iteration = 0
 					for iteration < lenMemory {
 						select {
-						case clientFound = <-cClient:
-							if clientFound != nil {
-								client = clientFound
+						case foundClient = <-cClient:
+							if foundClient != nil {
+								client = foundClient
 							}
 							iteration++
 						}
