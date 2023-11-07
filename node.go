@@ -68,6 +68,7 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 		maybeNext *tReadData
 		err       error
 	}
+
 	type tWriteData struct {
 		prevMac tID
 		mac     tID
@@ -136,7 +137,6 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 
 				switch {
 				case readData.b[0]&0b00000000 == 0b00000000:
-					client = &tClient{}
 					bNextMac = sha256.Sum256(readData.b[1:readData.n])
 					readData.nextMac.p1 = uint64(bNextMac[0]) | uint64(bNextMac[1])<<8 | uint64(bNextMac[2])<<16 | uint64(bNextMac[3])<<24 |
 						uint64(bNextMac[4])<<32 | uint64(bNextMac[5])<<40 | uint64(bNextMac[6])<<48 | uint64(bNextMac[7])<<56
@@ -146,7 +146,12 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 						uint64(bNextMac[20])<<32 | uint64(bNextMac[21])<<40 | uint64(bNextMac[22])<<48 | uint64(bNextMac[23])<<56
 					readData.nextMac.p4 = uint64(bNextMac[24]) | uint64(bNextMac[25])<<8 | uint64(bNextMac[26])<<16 | uint64(bNextMac[27])<<24 |
 						uint64(bNextMac[28])<<32 | uint64(bNextMac[29])<<40 | uint64(bNextMac[30])<<48 | uint64(bNextMac[31])<<56
-					client.readData = readData
+
+					client = &tClient{
+						readData:    readData,
+						readNextMac: readData.nextMac,
+					}
+					
 					if memory != nil {
 						client.next = memory
 						memory = client
@@ -199,7 +204,6 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 					if client == nil {
 
 					}
-
 				default:
 					cFreeReadData <- readData
 				}
