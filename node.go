@@ -93,9 +93,9 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 			cid               tID
 			client            *tClient
 			bypass            func(c *tClient)
-			cBypass           chan interface{}
-			bypassDone        interface{}
-			bypassFoundClient interface{}
+			cBypass           chan *struct{}
+			bypassDone        *struct{}
+			bypassFoundClient *struct{}
 			foundClient       bool
 			iteration         int
 			bNextMac          [32]byte
@@ -187,7 +187,7 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 						memory = client
 					}
 					lenMemory++
-					cBypass = make(chan interface{}, lenMemory)
+					cBypass = make(chan *struct{}, lenMemory)
 				case readData.b[0]&0b10000000 == 0b10000000 && memory != nil:
 					cid.p1 = uint64(readData.b[1]) | uint64(readData.b[2])<<8 | uint64(readData.b[3])<<16 | uint64(readData.b[4])<<24 |
 						uint64(readData.b[5])<<32 | uint64(readData.b[6])<<40 | uint64(readData.b[7])<<48 | uint64(readData.b[8])<<56
@@ -219,7 +219,7 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 				default:
 					cFreeReadData <- readData
 				}
-				
+
 				goto LOOP
 			}
 		}
