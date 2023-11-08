@@ -25,10 +25,7 @@ func Handler(nodeID string, f func(query []byte, connection *Connection)) {
 }
 
 func Do(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
-	lock <- struct{}{}
-	err := do(tlsConfig, handlers, address, nodeAddresses...)
-	<-lock
-	return err
+	return do(handlers, tlsConfig, address, nodeAddresses...)
 }
 
 type handler struct {
@@ -45,14 +42,9 @@ type tID struct {
 
 var (
 	handlers []*handler
-	lock     chan struct{}
 )
 
-func init() {
-	lock = make(chan struct{}, 1)
-}
-
-func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
+func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
 	conn, err := net.ListenUDP("udp", address)
 	if err != nil {
 		return err
@@ -95,18 +87,21 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 		}
 
 		var (
-			memory      *tClient
-			lenMemory   int
-			cClient     chan *tClient
-			readData    *tReadData
-			cid         tID
-			client      *tClient
-			foundClient *tClient
-			bypass      func(c *tClient)
-			iteration   int
-			bNextMac    [32]byte
+			memory            *tClient
+			lenMemory         int
+			readData          *tReadData
+			cid               tID
+			client            *tClient
+			bypass            func(c *tClient)
+			cBypass           chan interface{}
+			bypassDone        interface{}
+			bypassFoundClient interface{}
+			foundClient       bool
+			iteration         int
+			bNextMac          [32]byte
 		)
 
+		bypassFoundClient = new(struct{})
 		bypass = func(c *tClient) {
 			if c.next != nil {
 				go bypass(c.next)
@@ -117,15 +112,22 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 		LOOP:
 			if m.p1 == cid.p1 && m.p2 == cid.p2 &&
 				m.p3 == cid.p3 && m.p4 == cid.p4 {
-				cClient <- c
+
+				//
+				//
+				//
+
+				cBypass <- bypassFoundClient
+
 				return
 			}
 			if w != nil && w.prev != nil {
 				w = w.prev
 				m = w.mac
+
 				goto LOOP
 			}
-			cClient <- nil
+			cBypass <- nil
 		}
 
 		for {
@@ -151,7 +153,7 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 						readData:    readData,
 						readNextMac: readData.nextMac,
 					}
-					
+
 					if memory != nil {
 						client.next = memory
 						memory = client
@@ -159,7 +161,7 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 						memory = client
 					}
 					lenMemory++
-					cClient = make(chan *tClient, lenMemory)
+					cBypass = make(chan interface{}, lenMemory)
 				case readData.b[0]&0b10000000 == 0b10000000 && memory != nil:
 					cid.p1 = uint64(readData.b[1]) | uint64(readData.b[2])<<8 | uint64(readData.b[3])<<16 | uint64(readData.b[4])<<24 |
 						uint64(readData.b[5])<<32 | uint64(readData.b[6])<<40 | uint64(readData.b[7])<<48 | uint64(readData.b[8])<<56
@@ -189,21 +191,22 @@ func do(tlsConfig *tls.Config, handlers []*handler, address *net.UDPAddr, nodeAd
 
 					go bypass(memory)
 
-					client = nil
 					iteration = 0
+					foundClient = false
 					for iteration < lenMemory {
 						select {
-						case foundClient = <-cClient:
-							if foundClient != nil {
-								client = foundClient
+						case bypassDone = <-cBypass:
+							if bypassDone == bypassFoundClient {
+								foundClient = true
 							}
 							iteration++
 						}
 					}
 
-					if client == nil {
-
+					if !foundClient {
+						cFreeReadData <- readData
 					}
+
 				default:
 					cFreeReadData <- readData
 				}
