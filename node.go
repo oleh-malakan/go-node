@@ -130,6 +130,28 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 			cBypass <- nil
 		}
 
+		goto LOOP
+	BYPASS:
+		go bypass(memory)
+
+		iteration = 0
+		foundClient = false
+		for iteration < lenMemory {
+			select {
+			case bypassDone = <-cBypass:
+				switch bypassDone {
+				case bypassFoundClient:
+					foundClient = true
+				}
+				iteration++
+			}
+		}
+
+		if !foundClient {
+			cFreeReadData <- readData
+		}
+
+	LOOP:
 		for {
 			select {
 			case readData = <-cReadData:
@@ -189,24 +211,7 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 					readData.nextMac.p4 = uint64(bNextMac[24]) | uint64(bNextMac[25])<<8 | uint64(bNextMac[26])<<16 | uint64(bNextMac[27])<<24 |
 						uint64(bNextMac[28])<<32 | uint64(bNextMac[29])<<40 | uint64(bNextMac[30])<<48 | uint64(bNextMac[31])<<56
 
-					go bypass(memory)
-
-					iteration = 0
-					foundClient = false
-					for iteration < lenMemory {
-						select {
-						case bypassDone = <-cBypass:
-							if bypassDone == bypassFoundClient {
-								foundClient = true
-							}
-							iteration++
-						}
-					}
-
-					if !foundClient {
-						cFreeReadData <- readData
-					}
-
+					goto BYPASS
 				default:
 					cFreeReadData <- readData
 				}
