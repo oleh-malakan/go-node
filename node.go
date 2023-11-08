@@ -107,26 +107,29 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 				go bypass(c.next)
 			}
 
-			w := c.writeData
-			m := c.writeLastMac
-		LOOP:
-			if m.p1 == cid.p1 && m.p2 == cid.p2 &&
-				m.p3 == cid.p3 && m.p4 == cid.p4 {
+			if readData != nil {
+				w := c.writeData
+				m := c.writeLastMac
+			LOOP:
+				if m.p1 == cid.p1 && m.p2 == cid.p2 &&
+					m.p3 == cid.p3 && m.p4 == cid.p4 {
 
-				//
-				//
-				//
+					//
+					//
+					//
 
-				cBypass <- bypassFoundClient
+					cBypass <- bypassFoundClient
 
-				return
+					return
+				}
+				if w != nil && w.prev != nil {
+					w = w.prev
+					m = w.mac
+
+					goto LOOP
+				}
 			}
-			if w != nil && w.prev != nil {
-				w = w.prev
-				m = w.mac
 
-				goto LOOP
-			}
 			cBypass <- nil
 		}
 
@@ -147,11 +150,12 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 			}
 		}
 
-		if !foundClient {
+		if !foundClient && readData != nil {
 			cFreeReadData <- readData
 		}
 
 	LOOP:
+		readData = nil
 		for {
 			select {
 			case readData = <-cReadData:
@@ -215,6 +219,8 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 				default:
 					cFreeReadData <- readData
 				}
+				
+				goto LOOP
 			}
 		}
 	}()
