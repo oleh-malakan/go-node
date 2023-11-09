@@ -135,6 +135,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 					//
 					//
 					//
+					readData = nil
 
 					cBypass <- bypassFoundClient
 
@@ -170,14 +171,15 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 
 		if !foundClient && readData != nil {
 			cFreeReadData <- readData
+			readData = nil
 		}
 	LOOP:
 		for {
-			readData = nil
 			select {
 			case readData = <-cReadData:
 				if readData.err != nil {
 					cFreeReadData <- readData
+					readData = nil
 				}
 
 				switch {
@@ -186,6 +188,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 						if lenMemory >= clientsLimit {
 							// go f(readData.rAddr)
 							cFreeReadData <- readData
+							readData = nil
 							break
 						}
 					}
@@ -204,6 +207,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 						readData:    readData,
 						nextReadMac: readData.nextMac,
 					}
+					readData = nil
 
 					if memory != nil {
 						client.next = memory
@@ -243,6 +247,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 					goto BYPASS
 				default:
 					cFreeReadData <- readData
+					readData = nil
 				}
 			}
 		}
