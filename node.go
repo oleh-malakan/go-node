@@ -6,6 +6,11 @@ import (
 	"net"
 )
 
+type Config struct {
+	ClientsLimit int
+	BufferSize   int
+}
+
 func Handler(nodeID string, f func(query []byte, connection *Connection)) {
 	b := sha256.Sum256([]byte(nodeID))
 	h := &handler{
@@ -24,8 +29,19 @@ func Handler(nodeID string, f func(query []byte, connection *Connection)) {
 	handlers = append(handlers, h)
 }
 
-func Do(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
-	return do(handlers, tlsConfig, address, nodeAddresses...)
+func Do(tlsConfig *tls.Config, config *Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
+	if tlsConfig == nil {
+		return newError("require tls config")
+	}
+
+	if config == nil {
+		config = &Config{
+			ClientsLimit: 0,
+			BufferSize:   512,
+		}
+	}
+
+	return do(handlers, tlsConfig, config.ClientsLimit, config.BufferSize, address, nodeAddresses...)
 }
 
 type handler struct {
@@ -44,21 +60,22 @@ var (
 	handlers []*handler
 )
 
-func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
+func do(handlers []*handler, tlsConfig *tls.Config,
+	clientsLimit int, bufferSize int,
+	address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
 	conn, err := net.ListenUDP("udp", address)
 	if err != nil {
 		return err
 	}
 
 	type tReadData struct {
-		b         []byte
-		n         int
-		rAddr     *net.UDPAddr
-		mac       tID
-		nextMac   tID
-		next      *tReadData
-		maybeNext *tReadData
-		err       error
+		b       []byte
+		n       int
+		rAddr   *net.UDPAddr
+		mac     tID
+		nextMac tID
+		next    *tReadData
+		err     error
 	}
 
 	type tWriteData struct {
@@ -67,9 +84,9 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 		prev    *tWriteData
 	}
 
-	cReadData := make(chan *tReadData, 512)
-	cFreeReadData := make(chan *tReadData, 512)
-	for i := 0; i < 512; i++ {
+	cReadData := make(chan *tReadData, bufferSize)
+	cFreeReadData := make(chan *tReadData, bufferSize)
+	for i := 0; i < bufferSize; i++ {
 		cFreeReadData <- &tReadData{
 			b: make([]byte, 1432),
 		}
@@ -165,6 +182,14 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 
 				switch {
 				case readData.b[0]&0b00000000 == 0b00000000:
+					if clientsLimit > 0 {
+						if lenMemory >= clientsLimit {
+							// go f(readData.rAddr)
+							cFreeReadData <- readData
+							break
+						}
+					}
+
 					bNextMac = sha256.Sum256(readData.b[1:readData.n])
 					readData.nextMac.p1 = uint64(bNextMac[0]) | uint64(bNextMac[1])<<8 | uint64(bNextMac[2])<<16 | uint64(bNextMac[3])<<24 |
 						uint64(bNextMac[4])<<32 | uint64(bNextMac[5])<<40 | uint64(bNextMac[6])<<48 | uint64(bNextMac[7])<<56

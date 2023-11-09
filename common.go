@@ -13,3 +13,15 @@ func (c *Connection) Receive() ([]byte, error) {
 func (c *Connection) Close() error {
 	return nil
 }
+
+type tError struct {
+	text string
+}
+
+func (e *tError) Error() string {
+	return e.text
+}
+
+func newError(text string) *tError {
+	return &tError{text}
+}
