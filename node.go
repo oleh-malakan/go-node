@@ -171,10 +171,9 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 		if !foundClient && readData != nil {
 			cFreeReadData <- readData
 		}
-
 	LOOP:
-		readData = nil
 		for {
+			readData = nil
 			select {
 			case readData = <-cReadData:
 				if readData.err != nil {
@@ -245,8 +244,6 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 				default:
 					cFreeReadData <- readData
 				}
-
-				goto LOOP
 			}
 		}
 	}()
