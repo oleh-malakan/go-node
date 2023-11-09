@@ -95,11 +95,12 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 	go func() {
 		type tClient struct {
 			rAddr        *net.UDPAddr
+			lastReadData *tReadData
 			readData     *tReadData
-			readNextMac  tID
+			nextReadMac  tID
 			readed       int
 			writeData    *tWriteData
-			writeLastMac tID
+			lastWriteMac tID
 			next         *tClient
 		}
 
@@ -126,7 +127,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 
 			if readData != nil {
 				w := c.writeData
-				m := c.writeLastMac
+				m := c.lastWriteMac
 			LOOP:
 				if m.p1 == cid.p1 && m.p2 == cid.p2 &&
 					m.p3 == cid.p3 && m.p4 == cid.p4 {
@@ -202,7 +203,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 
 					client = &tClient{
 						readData:    readData,
-						readNextMac: readData.nextMac,
+						nextReadMac: readData.nextMac,
 					}
 
 					if memory != nil {
