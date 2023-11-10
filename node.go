@@ -124,12 +124,12 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 
 		bypassFoundClient = new(struct{})
 		bypass = func(c *tClient) {
-		LOOP1:
+		NEXT:
 			if c.next != nil && !c.next.drop {
 				go bypass(c.next)
 			} else if c.next.next != nil {
 				c.next = c.next.next
-				goto LOOP1
+				goto NEXT
 			} else {
 				c.next = nil
 			}
@@ -137,7 +137,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 			if readData != nil {
 				w := c.writeData
 				m := c.lastWriteMac
-			LOOP2:
+			LOOP:
 				if m.p1 == cid.p1 && m.p2 == cid.p2 &&
 					m.p3 == cid.p3 && m.p4 == cid.p4 {
 
@@ -154,7 +154,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 					w = w.prev
 					m = w.mac
 
-					goto LOOP2
+					goto LOOP
 				}
 			}
 
