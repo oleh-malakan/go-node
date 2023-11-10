@@ -7,8 +7,8 @@ import (
 )
 
 type Config struct {
-	ClientsLimit int
-	BufferSize   int
+	ClientCount int
+	BufferSize  int
 }
 
 func Handler(nodeID string, f func(query []byte, connection *Connection)) {
@@ -36,12 +36,12 @@ func Do(tlsConfig *tls.Config, config *Config, address *net.UDPAddr, nodeAddress
 
 	if config == nil {
 		config = &Config{
-			ClientsLimit: 0,
-			BufferSize:   512,
+			ClientCount: 9096,
+			BufferSize:  9096,
 		}
 	}
 
-	return do(handlers, tlsConfig, config.ClientsLimit, config.BufferSize, address, nodeAddresses...)
+	return do(handlers, tlsConfig, config.ClientCount, config.BufferSize, address, nodeAddresses...)
 }
 
 type handler struct {
@@ -61,7 +61,7 @@ var (
 )
 
 func do(handlers []*handler, tlsConfig *tls.Config,
-	clientsLimit int, bufferSize int,
+	clientCount int, bufferSize int,
 	address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
 	conn, err := net.ListenUDP("udp", address)
 	if err != nil {
@@ -122,16 +122,28 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 			bNextMac          [32]byte
 		)
 
+		cFreeClient := make(chan *tClient, clientCount)
+		for i := 0; i < clientCount; i++ {
+			cFreeClient <- &tClient{}
+		}
+
 		bypassFoundClient = new(struct{})
 		bypass = func(c *tClient) {
 		NEXT:
 			if c.next != nil && !c.next.drop {
 				go bypass(c.next)
-			} else if c.next.next != nil {
-				c.next = c.next.next
-				goto NEXT
 			} else {
-				c.next = nil
+				if c.next.next != nil {
+					d := c.next
+					c.next = c.next.next					
+					d.next = nil
+					cFreeClient <- d
+					goto NEXT
+				} else {
+					cFreeClient <- c.next
+					c.next = nil
+				}
+
 			}
 
 			if readData != nil {
@@ -201,13 +213,12 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 
 				switch {
 				case readData.b[0]&0b00000000 == 0b00000000:
-					if clientsLimit > 0 {
-						if lenMemory >= clientsLimit {
-							// go f(readData.rAddr)
-							cFreeReadData <- readData
-							readData = nil
-							break
-						}
+					select {
+					case client = <-cFreeClient:
+					default:
+						cFreeReadData <- readData
+						readData = nil
+						break
 					}
 
 					bNextMac = sha256.Sum256(readData.b[1:readData.n])
@@ -220,10 +231,9 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 					readData.nextMac.p4 = uint64(bNextMac[24]) | uint64(bNextMac[25])<<8 | uint64(bNextMac[26])<<16 | uint64(bNextMac[27])<<24 |
 						uint64(bNextMac[28])<<32 | uint64(bNextMac[29])<<40 | uint64(bNextMac[30])<<48 | uint64(bNextMac[31])<<56
 
-					client = &tClient{
-						readData:    readData,
-						nextReadMac: readData.nextMac,
-					}
+					client.readData = readData
+					client.nextReadMac = readData.nextMac
+					client.drop = false
 					readData = nil
 
 					if memory != nil {
