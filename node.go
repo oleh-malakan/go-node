@@ -102,6 +102,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 			writeData    *tWriteData
 			lastWriteMac tID
 			next         *tClient
+			drop         bool
 		}
 
 		var (
@@ -114,21 +115,29 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 			cBypass           chan *struct{}
 			bypassDone        *struct{}
 			bypassFoundClient *struct{}
+			bypassDropClient  *struct{}
 			foundClient       bool
+			dropClientCount   int
 			iteration         int
 			bNextMac          [32]byte
 		)
 
 		bypassFoundClient = new(struct{})
 		bypass = func(c *tClient) {
-			if c.next != nil {
+		LOOP1:
+			if c.next != nil && !c.next.drop {
 				go bypass(c.next)
+			} else if c.next.next != nil {
+				c.next = c.next.next
+				goto LOOP1
+			} else {
+				c.next = nil
 			}
 
 			if readData != nil {
 				w := c.writeData
 				m := c.lastWriteMac
-			LOOP:
+			LOOP2:
 				if m.p1 == cid.p1 && m.p2 == cid.p2 &&
 					m.p3 == cid.p3 && m.p4 == cid.p4 {
 
@@ -145,7 +154,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 					w = w.prev
 					m = w.mac
 
-					goto LOOP
+					goto LOOP2
 				}
 			}
 
@@ -164,6 +173,8 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 				switch bypassDone {
 				case bypassFoundClient:
 					foundClient = true
+				case bypassDropClient:
+					dropClientCount++
 				}
 				iteration++
 			}
@@ -172,6 +183,12 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 		if !foundClient && readData != nil {
 			cFreeReadData <- readData
 			readData = nil
+		}
+
+		if dropClientCount > 0 {
+			lenMemory = lenMemory - dropClientCount
+			cBypass = make(chan *struct{}, lenMemory)
+			dropClientCount = 0
 		}
 	LOOP:
 		for {
