@@ -216,7 +216,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 						}
 					}
 
-					if !foundClient {
+					if !foundClient && readData != nil {
 						cFreeReadData <- readData
 					}
 				}()
