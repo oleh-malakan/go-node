@@ -177,7 +177,6 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 								//
 								//
 								//
-								readData = nil
 
 								cReport <- reportFoundClient
 								goto FOUND
@@ -217,9 +216,8 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 						}
 					}
 
-					if !foundClient && readData != nil {
+					if !foundClient {
 						cFreeReadData <- readData
-						readData = nil
 					}
 				}()
 			}
@@ -292,6 +290,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 						uint64(bNextMac[28])<<32 | uint64(bNextMac[29])<<40 | uint64(bNextMac[30])<<48 | uint64(bNextMac[31])<<56
 
 					bypassMemory()
+					readData = nil
 				default:
 					cFreeReadData <- readData
 					readData = nil
