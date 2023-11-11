@@ -107,6 +107,10 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 			drop         bool
 		}
 
+		type tReportIterationCount struct {
+			count int
+		}
+
 		var (
 			memory   *tClient
 			readData *tReadData
@@ -114,6 +118,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 			client   *tClient
 			bNextMac [32]byte
 		)
+		reportFoundClient := new(struct{})
 
 		cFreeClient := make(chan *tClient, clientCount)
 		for i := 0; i < clientCount; i++ {
@@ -131,10 +136,6 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 
 				go func() {
 					cReport := make(chan interface{})
-					reportFoundClient := new(struct{})
-					type tReportIterationCount struct {
-						count int
-					}
 					reportIterationCount := &tReportIterationCount{}
 
 					var bypass func(c *tClient, i int)
