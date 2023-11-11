@@ -101,108 +101,130 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 			readed       int
 			writeData    *tWriteData
 			lastWriteMac tID
+			lock         chan *struct{}
+			bypassLock   chan *struct{}
 			next         *tClient
 			drop         bool
 		}
 
 		var (
-			memory            *tClient
-			lenMemory         int
-			readData          *tReadData
-			cid               tID
-			client            *tClient
-			bypass            func(c *tClient)
-			cBypass           chan *struct{}
-			bypassDone        *struct{}
-			bypassFoundClient *struct{}
-			bypassDropClient  *struct{}
-			foundClient       bool
-			dropClientCount   int
-			iteration         int
-			bNextMac          [32]byte
+			memory   *tClient
+			readData *tReadData
+			cid      tID
+			client   *tClient
+			bNextMac [32]byte
 		)
 
 		cFreeClient := make(chan *tClient, clientCount)
 		for i := 0; i < clientCount; i++ {
-			cFreeClient <- &tClient{}
-		}
-
-		bypassFoundClient = new(struct{})
-		bypass = func(c *tClient) {
-		NEXT:
-			if c.next != nil && !c.next.drop {
-				go bypass(c.next)
-			} else {
-				if c.next.next != nil {
-					d := c.next
-					c.next = c.next.next					
-					d.next = nil
-					cFreeClient <- d
-					goto NEXT
-				} else {
-					cFreeClient <- c.next
-					c.next = nil
-				}
-
-			}
-
-			if readData != nil {
-				w := c.writeData
-				m := c.lastWriteMac
-			LOOP:
-				if m.p1 == cid.p1 && m.p2 == cid.p2 &&
-					m.p3 == cid.p3 && m.p4 == cid.p4 {
-
-					//
-					//
-					//
-					readData = nil
-
-					cBypass <- bypassFoundClient
-
-					return
-				}
-				if w != nil && w.prev != nil {
-					w = w.prev
-					m = w.mac
-
-					goto LOOP
-				}
-			}
-
-			cBypass <- nil
-		}
-
-		goto LOOP
-	BYPASS:
-		go bypass(memory)
-
-		iteration = 0
-		foundClient = false
-		for iteration < lenMemory {
-			select {
-			case bypassDone = <-cBypass:
-				switch bypassDone {
-				case bypassFoundClient:
-					foundClient = true
-				case bypassDropClient:
-					dropClientCount++
-				}
-				iteration++
+			cFreeClient <- &tClient{
+				lock:       make(chan *struct{}, 1),
+				bypassLock: make(chan *struct{}, 1),
 			}
 		}
 
-		if !foundClient && readData != nil {
-			cFreeReadData <- readData
-			readData = nil
+		bypassMemory := func() {
+			if memory != nil {
+				memory := memory
+				readData := readData
+				cid := cid
+
+				go func() {
+					cReport := make(chan interface{})
+					reportFoundClient := new(struct{})
+					type tReportIterationCount struct {
+						count int
+					}
+					reportIterationCount := &tReportIterationCount{}
+
+					var bypass func(c *tClient, i int)
+					bypass = func(c *tClient, i int) {
+						i++
+						c.bypassLock <- nil
+					NEXT:
+						if c.next != nil {
+							if !c.next.drop {
+								go bypass(c.next, i)
+							} else {
+								d := c.next
+								d.bypassLock <- nil
+								d.lock <- nil
+								if d.next != nil {
+									c.next = d.next
+									d.next = nil
+								} else {
+									c.next = nil
+								}
+								cFreeClient <- d
+								<-d.lock
+								<-d.bypassLock
+								goto NEXT
+							}
+						} else {
+							reportIterationCount.count = i
+							cReport <- reportIterationCount
+						}
+						<-c.bypassLock
+
+						c.lock <- nil
+						if readData != nil {
+							w := c.writeData
+							m := c.lastWriteMac
+						LOOP:
+							if m.p1 == cid.p1 && m.p2 == cid.p2 &&
+								m.p3 == cid.p3 && m.p4 == cid.p4 {
+
+								//
+								//
+								//
+								readData = nil
+
+								cReport <- reportFoundClient
+								goto FOUND
+							}
+							if w != nil && w.prev != nil {
+								w = w.prev
+								m = w.mac
+
+								goto LOOP
+							}
+						FOUND:
+						}
+						<-c.lock
+						cReport <- nil
+					}
+
+					go bypass(memory, 0)
+
+					var (
+						report         interface{}
+						iteration      int
+						iterationCount int
+						foundClient    bool
+					)
+
+					for iterationCount == 0 || iteration < iterationCount {
+						select {
+						case report = <-cReport:
+							switch report {
+							case nil:
+								iteration++
+							case reportFoundClient:
+								foundClient = true
+							case reportIterationCount:
+								iterationCount = reportIterationCount.count
+							}
+						}
+					}
+
+					if !foundClient && readData != nil {
+						cFreeReadData <- readData
+						readData = nil
+					}
+				}()
+			}
 		}
 
-		if dropClientCount > 0 {
-			lenMemory = lenMemory - dropClientCount
-			cBypass = make(chan *struct{}, lenMemory)
-			dropClientCount = 0
-		}
-	LOOP:
 		for {
 			select {
 			case readData = <-cReadData:
@@ -242,8 +264,6 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 					} else {
 						memory = client
 					}
-					lenMemory++
-					cBypass = make(chan *struct{}, lenMemory)
 				case readData.b[0]&0b10000000 == 0b10000000 && memory != nil:
 					cid.p1 = uint64(readData.b[1]) | uint64(readData.b[2])<<8 | uint64(readData.b[3])<<16 | uint64(readData.b[4])<<24 |
 						uint64(readData.b[5])<<32 | uint64(readData.b[6])<<40 | uint64(readData.b[7])<<48 | uint64(readData.b[8])<<56
@@ -271,7 +291,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 					readData.nextMac.p4 = uint64(bNextMac[24]) | uint64(bNextMac[25])<<8 | uint64(bNextMac[26])<<16 | uint64(bNextMac[27])<<24 |
 						uint64(bNextMac[28])<<32 | uint64(bNextMac[29])<<40 | uint64(bNextMac[30])<<48 | uint64(bNextMac[31])<<56
 
-					goto BYPASS
+					bypassMemory()
 				default:
 					cFreeReadData <- readData
 					readData = nil
