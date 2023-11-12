@@ -130,10 +130,11 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 			}
 		}
 
-		handshake := func(c *tClient) {
+		handshake := func() {
+			client := client
 			go func() {
-				c.conn.Close()
-				if err := c.conn.Handshake(); err != nil {
+				client.conn.Close()
+				if err := client.conn.Handshake(); err != nil {
 
 				}
 
@@ -270,7 +271,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 					client.nextReadMac = readData.nextMac
 					client.drop = false
 					readData = nil
-					handshake(client)
+					handshake()
 
 					if memory != nil {
 						client.next = memory
