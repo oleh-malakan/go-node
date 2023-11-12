@@ -94,6 +94,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 
 	go func() {
 		type tClient struct {
+			conn         *tls.Conn
 			rAddr        *net.UDPAddr
 			lastReadData *tReadData
 			readData     *tReadData
@@ -123,9 +124,20 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 		cFreeClient := make(chan *tClient, clientCount)
 		for i := 0; i < clientCount; i++ {
 			cFreeClient <- &tClient{
+				conn:       tls.Server(&dataport{}, tlsConfig),
 				lock:       make(chan *struct{}, 1),
 				bypassLock: make(chan *struct{}, 1),
 			}
+		}
+
+		handshake := func(c *tClient) {
+			go func() {
+				c.conn.Close()
+				if err := c.conn.Handshake(); err != nil {
+
+				}
+
+			}()
 		}
 
 		bypassMemory := func() {
@@ -168,27 +180,29 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 						<-c.bypassLock
 
 						c.lock <- nil
-						if readData != nil {
-							w := c.writeData
-							m := c.lastWriteMac
-						LOOP:
-							if m.p1 == cid.p1 && m.p2 == cid.p2 &&
-								m.p3 == cid.p3 && m.p4 == cid.p4 {
+						if !c.drop {
+							if readData != nil {
+								w := c.writeData
+								m := c.lastWriteMac
+							LOOP:
+								if m.p1 == cid.p1 && m.p2 == cid.p2 &&
+									m.p3 == cid.p3 && m.p4 == cid.p4 {
 
-								//
-								//
-								//
+									//
+									//
+									//
 
-								cReport <- reportFoundClient
-								goto FOUND
+									cReport <- reportFoundClient
+									goto FOUND
+								}
+								if w != nil && w.prev != nil {
+									w = w.prev
+									m = w.mac
+
+									goto LOOP
+								}
+							FOUND:
 							}
-							if w != nil && w.prev != nil {
-								w = w.prev
-								m = w.mac
-
-								goto LOOP
-							}
-						FOUND:
 						}
 						<-c.lock
 						cReport <- nil
@@ -256,6 +270,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 					client.nextReadMac = readData.nextMac
 					client.drop = false
 					readData = nil
+					handshake(client)
 
 					if memory != nil {
 						client.next = memory
