@@ -62,6 +62,117 @@ var (
 	handlers []*handler
 )
 
+type tReadData struct {
+	b             []byte
+	n             int
+	rAddr         *net.UDPAddr
+	cid           tID
+	mac           tID
+	nextMac       tID
+	next          *tReadData
+	err           error
+	cSignalFound  chan int8
+	iteration     int
+	found         int
+	notFound      int
+	cFreeReadData chan *tReadData
+}
+
+func (r *tReadData) do() {
+	var (
+		found       int8
+		counterStop bool
+	)
+	for {
+		select {
+		case found = <-r.cSignalFound:
+			switch found {
+			case 0:
+				r.notFound++
+			case 1:
+				r.found++
+			case -1:
+				counterStop = true
+			}
+
+			if counterStop && r.found+r.notFound == r.iteration {
+				counterStop = false
+				r.iteration = 0
+				r.found = 0
+				r.notFound = 0
+				r.cFreeReadData <- r
+			}
+		}
+	}
+}
+
+type tWriteData struct {
+	prevMac tID
+	mac     tID
+	prev    *tWriteData
+}
+
+type tClient struct {
+	conn         *tls.Conn
+	cRead        chan *tReadData
+	rAddr        *net.UDPAddr
+	lastReadData *tReadData
+	readData     *tReadData
+	nextReadMac  tID
+	readed       int
+	writeData    *tWriteData
+	lastWriteMac tID
+	cSignalRead  chan *tReadData
+	next         *tClient
+	memoryLock   chan *struct{}
+	drop         bool
+}
+
+func (c *tClient) bypass() {
+	var readData *tReadData
+	for {
+		select {
+		case readData = <-c.cSignalRead:
+			if c.next != nil {
+				readData.iteration++
+				c.next.cSignalRead <- readData
+			} else {
+				readData.cSignalFound <- -1
+			}
+			c.cRead <- readData
+		}
+	}
+}
+
+func (c tClient) do() {
+	var readData *tReadData
+	for {
+		select {
+		case readData = <-c.cRead:
+			w := c.writeData
+			m := c.lastWriteMac
+		LOOP:
+			if m.p1 == readData.cid.p1 && m.p2 == readData.cid.p2 &&
+				m.p3 == readData.cid.p3 && m.p4 == readData.cid.p4 {
+
+				//
+				//
+				//
+
+				readData.cSignalFound <- 1
+				continue
+			}
+			if w != nil && w.prev != nil {
+				w = w.prev
+				m = w.mac
+
+				goto LOOP
+			}
+			readData.cSignalFound <- 0
+		}
+	}
+}
+
 func do(handlers []*handler, tlsConfig *tls.Config,
 	strokes int, clientCount int, bufferSize int,
 	address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
@@ -72,165 +183,36 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 
 	cFatal := make(chan error)
 
-	type tReadData struct {
-		b       []byte
-		n       int
-		rAddr   *net.UDPAddr
-		cid     tID
-		mac     tID
-		nextMac tID
-		next    *tReadData
-		err     error
-	}
-
-	type tWriteData struct {
-		prevMac tID
-		mac     tID
-		prev    *tWriteData
-	}
-
 	cFreeReadData := make(chan *tReadData, bufferSize)
 	go func() {
 		for i := 0; i < bufferSize; i++ {
-			cFreeReadData <- &tReadData{
+			readData := &tReadData{
 				b: make([]byte, 1432),
 			}
+			go readData.do()
+			cFreeReadData <- readData
 		}
 	}()
-
-	type tClient struct {
-		conn         *tls.Conn
-		cRead        chan *tReadData
-		rAddr        *net.UDPAddr
-		lastReadData *tReadData
-		readData     *tReadData
-		nextReadMac  tID
-		readed       int
-		writeData    *tWriteData
-		lastWriteMac tID
-		cSignalRead  chan *tReadData
-		next         *tClient
-		memoryLock   chan *struct{}
-		drop         bool
-	}
-
-	type tReportIterationCount struct {
-		count int
-	}
 
 	var memory *tClient
 	memoryLock := make(chan *struct{}, 1)
 
-	//	reportFoundClient := new(struct{})
-
 	cFreeClient := make(chan *tClient, clientCount)
 	go func() {
 		for i := 0; i < clientCount; i++ {
-			cFreeClient <- &tClient{
+			client := &tClient{
 				conn:        tls.Server(&dataport{}, tlsConfig),
 				cRead:       make(chan *tReadData, strokes),
 				cSignalRead: make(chan *tReadData),
 				memoryLock:  make(chan *struct{}, 1),
 			}
+			go client.bypass()
+			go client.do()
+			cFreeClient <- client
 		}
 	}()
-	/*
-		bypassMemory := func(readData *tReadData) {
 
-			memory := memory
-			if memory != nil {
-				cReport := make(chan interface{})
-				reportIterationCount := &tReportIterationCount{}
-
-				var bypass func(c *tClient, i int)
-				bypass = func(c *tClient, i int) {
-					i++
-					c.bypassLock <- nil
-				NEXT:
-					if c.next != nil {
-						if !c.next.drop {
-							go bypass(c.next, i)
-						} else {
-							d := c.next
-							d.bypassLock <- nil
-							d.lock <- nil
-							if d.next != nil {
-								c.next = d.next
-								d.next = nil
-							} else {
-								c.next = nil
-							}
-							cFreeClient <- d
-							<-d.lock
-							<-d.bypassLock
-							goto NEXT
-						}
-					} else {
-						reportIterationCount.count = i
-						cReport <- reportIterationCount
-					}
-					<-c.bypassLock
-
-					c.lock <- nil
-					if !c.drop {
-						if readData != nil {
-							w := c.writeData
-							m := c.lastWriteMac
-						LOOP:
-							if m.p1 == cid.p1 && m.p2 == cid.p2 &&
-								m.p3 == cid.p3 && m.p4 == cid.p4 {
-
-								//
-								//
-								//
-
-								cReport <- reportFoundClient
-								goto FOUND
-							}
-							if w != nil && w.prev != nil {
-								w = w.prev
-								m = w.mac
-
-								goto LOOP
-							}
-						FOUND:
-						}
-					}
-					<-c.lock
-					cReport <- nil
-				}
-
-				go bypass(memory, 0)
-
-				var (
-					report         interface{}
-					iteration      int
-					iterationCount int
-					foundClient    bool
-				)
-
-				for iterationCount == 0 || iteration < iterationCount {
-					select {
-					case report = <-cReport:
-						switch report {
-						case nil:
-							iteration++
-						case reportFoundClient:
-							foundClient = true
-						case reportIterationCount:
-							iterationCount = reportIterationCount.count
-						}
-					}
-				}
-
-				if !foundClient && readData != nil {
-					cFreeReadData <- readData
-				}
-			}
-		}
-	*/
 	var readData *tReadData
-	cStroke := make(chan *struct{}, strokes)
 	for i := 0; i < strokes; i++ {
 		go func() {
 			var (
@@ -238,8 +220,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 				bNextMac [32]byte
 			)
 
-			select {
-			case cStroke <- nil:
+			for {
 				readData = <-cFreeReadData
 				readData.n, readData.rAddr, readData.err = conn.ReadFromUDP(readData.b)
 
@@ -307,13 +288,12 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 						uint64(bNextMac[28])<<32 | uint64(bNextMac[29])<<40 | uint64(bNextMac[30])<<48 | uint64(bNextMac[31])<<56
 
 					if memory != nil {
+						readData.iteration++
 						memory.cSignalRead <- readData
 					}
 				default:
 					cFreeReadData <- readData
 				}
-
-				<-cStroke
 			}
 		}()
 	}
