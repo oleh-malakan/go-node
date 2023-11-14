@@ -88,7 +88,11 @@ func (c *tClient) bypass() {
 			if c.next != nil {
 				c.next.cSignalRead <- readData
 			}
-			c.cRead <- readData
+
+			select {
+			case c.cRead <- readData:
+			default:
+			}
 		}
 	}
 }
