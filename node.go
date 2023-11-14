@@ -70,12 +70,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 		return err
 	}
 
-	cStroke := make(chan *struct{}, strokes)
-	go func() {
-		for i := 0; i < strokes; i++ {
-			cStroke <- nil
-		}
-	}()
+	cFatal := make(chan error)
 
 	type tReadData struct {
 		b       []byte
@@ -111,8 +106,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 		readed       int
 		writeData    *tWriteData
 		lastWriteMac tID
-		lock         chan *struct{}
-		bypassLock   chan *struct{}
+		cRead        chan *tReadData
 		next         *tClient
 		drop         bool
 	}
@@ -130,13 +124,12 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 	go func() {
 		for i := 0; i < clientCount; i++ {
 			cFreeClient <- &tClient{
-				conn:       tls.Server(&dataport{}, tlsConfig),
-				lock:       make(chan *struct{}, 1),
-				bypassLock: make(chan *struct{}, 1),
+				conn: tls.Server(&dataport{}, tlsConfig),
+				cRead: make(chan *tReadData, strokes),
 			}
 		}
 	}()
-
+/*
 	bypassMemory := func(readData *tReadData) {
 		var (
 			cid      tID
@@ -299,17 +292,20 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 			}
 		}
 	}
-
+*/
 	var readData *tReadData
-	for {
-		select {
-		case <-cStroke:
-			go func() {
+	cStroke := make(chan *struct{}, strokes)
+	for i := 0; i < strokes; i++ {
+		go func() {
+			select {
+			case cStroke <- nil:
 				readData = <-cFreeReadData
 				readData.n, readData.rAddr, readData.err = conn.ReadFromUDP(readData.b)
 				go bypassMemory(readData)
 				<-cStroke
-			}()
-		}
+			}
+		}()
 	}
+
+	return <-cFatal
 }
