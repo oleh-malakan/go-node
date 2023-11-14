@@ -133,8 +133,8 @@ func (c *tClient) bypass() {
 	for {
 		select {
 		case readData = <-c.cSignalRead:
+			readData.iteration++
 			if c.next != nil {
-				readData.iteration++
 				c.next.cSignalRead <- readData
 			} else {
 				readData.cSignalFound <- -1
@@ -187,7 +187,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 	go func() {
 		for i := 0; i < bufferSize; i++ {
 			readData := &tReadData{
-				b: make([]byte, 1432),
+				b:             make([]byte, 1432),
 				cFreeReadData: cFreeReadData,
 			}
 			go readData.do()
@@ -289,7 +289,6 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 						uint64(bNextMac[28])<<32 | uint64(bNextMac[29])<<40 | uint64(bNextMac[30])<<48 | uint64(bNextMac[31])<<56
 
 					if memory != nil {
-						readData.iteration++
 						memory.cSignalRead <- readData
 					}
 				default:
