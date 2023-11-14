@@ -188,6 +188,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 		for i := 0; i < bufferSize; i++ {
 			readData := &tReadData{
 				b: make([]byte, 1432),
+				cFreeReadData: cFreeReadData,
 			}
 			go readData.do()
 			cFreeReadData <- readData
