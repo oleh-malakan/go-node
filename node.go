@@ -6,12 +6,6 @@ import (
 	"net"
 )
 
-type Config struct {
-	Strokes     int
-	ClientCount int
-	BufferSize  int
-}
-
 func Handler(nodeID string, f func(query []byte, connection *Connection)) {
 	b := sha256.Sum256([]byte(nodeID))
 	h := &handler{
@@ -30,20 +24,12 @@ func Handler(nodeID string, f func(query []byte, connection *Connection)) {
 	handlers = append(handlers, h)
 }
 
-func Do(tlsConfig *tls.Config, config *Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
+func Do(tlsConfig *tls.Config, strokes int, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
 	if tlsConfig == nil {
 		return newError("require tls config")
 	}
 
-	if config == nil {
-		config = &Config{
-			Strokes:     64,
-			ClientCount: 9096,
-			BufferSize:  9096,
-		}
-	}
-
-	return do(handlers, tlsConfig, config.Strokes, config.ClientCount, config.BufferSize, address, nodeAddresses...)
+	return do(handlers, tlsConfig, strokes, address, nodeAddresses...)
 }
 
 type handler struct {
@@ -63,47 +49,14 @@ var (
 )
 
 type tReadData struct {
-	b             []byte
-	n             int
-	rAddr         *net.UDPAddr
-	cid           tID
-	mac           tID
-	nextMac       tID
-	next          *tReadData
-	err           error
-	cSignalFound  chan int8
-	iteration     int
-	found         int
-	notFound      int
-	cFreeReadData chan *tReadData
-}
-
-func (r *tReadData) do() {
-	var (
-		found       int8
-		counterStop bool
-	)
-	for {
-		select {
-		case found = <-r.cSignalFound:
-			switch found {
-			case 0:
-				r.notFound++
-			case 1:
-				r.found++
-			case -1:
-				counterStop = true
-			}
-
-			if counterStop && r.found+r.notFound == r.iteration {
-				counterStop = false
-				r.iteration = 0
-				r.found = 0
-				r.notFound = 0
-				r.cFreeReadData <- r
-			}
-		}
-	}
+	b       []byte
+	n       int
+	rAddr   *net.UDPAddr
+	cid     tID
+	mac     tID
+	nextMac tID
+	next    *tReadData
+	err     error
 }
 
 type tWriteData struct {
@@ -129,15 +82,11 @@ type tClient struct {
 }
 
 func (c *tClient) bypass() {
-	var readData *tReadData
 	for {
 		select {
-		case readData = <-c.cSignalRead:
-			readData.iteration++
+		case readData := <-c.cSignalRead:
 			if c.next != nil {
 				c.next.cSignalRead <- readData
-			} else {
-				readData.cSignalFound <- -1
 			}
 			c.cRead <- readData
 		}
@@ -145,10 +94,9 @@ func (c *tClient) bypass() {
 }
 
 func (c tClient) do() {
-	var readData *tReadData
 	for {
 		select {
-		case readData = <-c.cRead:
+		case readData := <-c.cRead:
 			w := c.writeData
 			m := c.lastWriteMac
 		LOOP:
@@ -159,7 +107,6 @@ func (c tClient) do() {
 				//
 				//
 
-				readData.cSignalFound <- 1
 				continue
 			}
 			if w != nil && w.prev != nil {
@@ -168,13 +115,11 @@ func (c tClient) do() {
 
 				goto LOOP
 			}
-			readData.cSignalFound <- 0
 		}
 	}
 }
 
-func do(handlers []*handler, tlsConfig *tls.Config,
-	strokes int, clientCount int, bufferSize int,
+func do(handlers []*handler, tlsConfig *tls.Config, strokes int,
 	address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
 	conn, err := net.ListenUDP("udp", address)
 	if err != nil {
@@ -183,84 +128,57 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 
 	cFatal := make(chan error)
 
-	cFreeReadData := make(chan *tReadData, bufferSize)
-	go func() {
-		for i := 0; i < bufferSize; i++ {
-			readData := &tReadData{
-				b:             make([]byte, 1432),
-				cFreeReadData: cFreeReadData,
-			}
-			go readData.do()
-			cFreeReadData <- readData
-		}
-	}()
-
 	var memory *tClient
 	memoryLock := make(chan *struct{}, 1)
 
-	cFreeClient := make(chan *tClient, clientCount)
-	go func() {
-		for i := 0; i < clientCount; i++ {
-			client := &tClient{
-				conn:        tls.Server(&dataport{}, tlsConfig),
-				cRead:       make(chan *tReadData, strokes),
-				cSignalRead: make(chan *tReadData),
-				memoryLock:  make(chan *struct{}, 1),
-			}
-			go client.bypass()
-			go client.do()
-			cFreeClient <- client
-		}
-	}()
-
-	var readData *tReadData
 	for i := 0; i < strokes; i++ {
 		go func() {
-			var (
-				client   *tClient
-				bNextMac [32]byte
-			)
-
 			for {
-				readData = <-cFreeReadData
+				readData := &tReadData{
+					b: make([]byte, 1432),
+				}
 				readData.n, readData.rAddr, readData.err = conn.ReadFromUDP(readData.b)
 
 				switch {
 				case readData.b[0]&0b00000000 == 0b00000000:
-					select {
-					case client = <-cFreeClient:
-						bNextMac = sha256.Sum256(readData.b[1:readData.n])
-						readData.nextMac.p1 = uint64(bNextMac[0]) | uint64(bNextMac[1])<<8 | uint64(bNextMac[2])<<16 | uint64(bNextMac[3])<<24 |
-							uint64(bNextMac[4])<<32 | uint64(bNextMac[5])<<40 | uint64(bNextMac[6])<<48 | uint64(bNextMac[7])<<56
-						readData.nextMac.p2 = uint64(bNextMac[8]) | uint64(bNextMac[9])<<8 | uint64(bNextMac[10])<<16 | uint64(bNextMac[11])<<24 |
-							uint64(bNextMac[12])<<32 | uint64(bNextMac[13])<<40 | uint64(bNextMac[14])<<48 | uint64(bNextMac[15])<<56
-						readData.nextMac.p3 = uint64(bNextMac[16]) | uint64(bNextMac[17])<<8 | uint64(bNextMac[18])<<16 | uint64(bNextMac[19])<<24 |
-							uint64(bNextMac[20])<<32 | uint64(bNextMac[21])<<40 | uint64(bNextMac[22])<<48 | uint64(bNextMac[23])<<56
-						readData.nextMac.p4 = uint64(bNextMac[24]) | uint64(bNextMac[25])<<8 | uint64(bNextMac[26])<<16 | uint64(bNextMac[27])<<24 |
-							uint64(bNextMac[28])<<32 | uint64(bNextMac[29])<<40 | uint64(bNextMac[30])<<48 | uint64(bNextMac[31])<<56
-
-						client.readData = readData
-						client.nextReadMac = readData.nextMac
-						client.drop = false
-						/*
-							go func() {
-								if err := client.conn.Handshake(); err != nil {
-
-								}
-							}()
-						*/
-
-						memoryLock <- nil
-						if memory != nil {
-							client.next = memory
-							memory = client
-						} else {
-							memory = client
-						}
-						<-memoryLock
-					default:
-						cFreeReadData <- readData
+					client := &tClient{
+						conn:        tls.Server(&dataport{}, tlsConfig),
+						cRead:       make(chan *tReadData, strokes),
+						cSignalRead: make(chan *tReadData),
+						memoryLock:  make(chan *struct{}, 1),
 					}
+					go client.bypass()
+					go client.do()
+
+					bNextMac := sha256.Sum256(readData.b[1:readData.n])
+					readData.nextMac.p1 = uint64(bNextMac[0]) | uint64(bNextMac[1])<<8 | uint64(bNextMac[2])<<16 | uint64(bNextMac[3])<<24 |
+						uint64(bNextMac[4])<<32 | uint64(bNextMac[5])<<40 | uint64(bNextMac[6])<<48 | uint64(bNextMac[7])<<56
+					readData.nextMac.p2 = uint64(bNextMac[8]) | uint64(bNextMac[9])<<8 | uint64(bNextMac[10])<<16 | uint64(bNextMac[11])<<24 |
+						uint64(bNextMac[12])<<32 | uint64(bNextMac[13])<<40 | uint64(bNextMac[14])<<48 | uint64(bNextMac[15])<<56
+					readData.nextMac.p3 = uint64(bNextMac[16]) | uint64(bNextMac[17])<<8 | uint64(bNextMac[18])<<16 | uint64(bNextMac[19])<<24 |
+						uint64(bNextMac[20])<<32 | uint64(bNextMac[21])<<40 | uint64(bNextMac[22])<<48 | uint64(bNextMac[23])<<56
+					readData.nextMac.p4 = uint64(bNextMac[24]) | uint64(bNextMac[25])<<8 | uint64(bNextMac[26])<<16 | uint64(bNextMac[27])<<24 |
+						uint64(bNextMac[28])<<32 | uint64(bNextMac[29])<<40 | uint64(bNextMac[30])<<48 | uint64(bNextMac[31])<<56
+
+					client.readData = readData
+					client.nextReadMac = readData.nextMac
+					client.drop = false
+					/*
+						go func() {
+							if err := client.conn.Handshake(); err != nil {
+
+							}
+						}()
+					*/
+
+					memoryLock <- nil
+					if memory != nil {
+						client.next = memory
+						memory = client
+					} else {
+						memory = client
+					}
+					<-memoryLock
 				case readData.b[0]&0b10000000 == 0b10000000 && memory != nil:
 					readData.cid.p1 = uint64(readData.b[1]) | uint64(readData.b[2])<<8 | uint64(readData.b[3])<<16 | uint64(readData.b[4])<<24 |
 						uint64(readData.b[5])<<32 | uint64(readData.b[6])<<40 | uint64(readData.b[7])<<48 | uint64(readData.b[8])<<56
@@ -278,7 +196,7 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 						uint64(readData.b[53])<<32 | uint64(readData.b[54])<<40 | uint64(readData.b[55])<<48 | uint64(readData.b[56])<<56
 					readData.mac.p4 = uint64(readData.b[57]) | uint64(readData.b[58])<<8 | uint64(readData.b[59])<<16 | uint64(readData.b[60])<<24 |
 						uint64(readData.b[61])<<32 | uint64(readData.b[62])<<40 | uint64(readData.b[63])<<48 | uint64(readData.b[64])<<56
-					bNextMac = sha256.Sum256(readData.b[65:readData.n])
+					bNextMac := sha256.Sum256(readData.b[65:readData.n])
 					readData.nextMac.p1 = uint64(bNextMac[0]) | uint64(bNextMac[1])<<8 | uint64(bNextMac[2])<<16 | uint64(bNextMac[3])<<24 |
 						uint64(bNextMac[4])<<32 | uint64(bNextMac[5])<<40 | uint64(bNextMac[6])<<48 | uint64(bNextMac[7])<<56
 					readData.nextMac.p2 = uint64(bNextMac[8]) | uint64(bNextMac[9])<<8 | uint64(bNextMac[10])<<16 | uint64(bNextMac[11])<<24 |
@@ -291,8 +209,6 @@ func do(handlers []*handler, tlsConfig *tls.Config,
 					if memory != nil {
 						memory.cSignalRead <- readData
 					}
-				default:
-					cFreeReadData <- readData
 				}
 			}
 		}()
