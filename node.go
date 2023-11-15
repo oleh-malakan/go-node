@@ -24,12 +24,12 @@ func Handler(nodeID string, f func(query []byte, connection *Connection)) {
 	handlers = append(handlers, h)
 }
 
-func Do(tlsConfig *tls.Config, strokes int, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
+func Do(tlsConfig *tls.Config, threads int, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
 	if tlsConfig == nil {
 		return newError("require tls config")
 	}
 
-	return do(handlers, tlsConfig, strokes, address, nodeAddresses...)
+	return do(handlers, tlsConfig, threads, address, nodeAddresses...)
 }
 
 type handler struct {
@@ -67,7 +67,6 @@ type tWriteData struct {
 
 type tClient struct {
 	conn         *tls.Conn
-	cRead        chan *tReadData
 	rAddr        *net.UDPAddr
 	lastReadData *tReadData
 	readData     *tReadData
@@ -75,55 +74,12 @@ type tClient struct {
 	readed       int
 	writeData    *tWriteData
 	lastWriteMac tID
-	cSignalRead  chan *tReadData
 	next         *tClient
-	memoryLock   chan *struct{}
+	lock         chan *struct{}
 	drop         bool
 }
 
-func (c *tClient) bypass() {
-	for {
-		select {
-		case readData := <-c.cSignalRead:
-			if c.next != nil {
-				c.next.cSignalRead <- readData
-			}
-
-			select {
-			case c.cRead <- readData:
-			default:
-			}
-		}
-	}
-}
-
-func (c tClient) do() {
-	for {
-		select {
-		case readData := <-c.cRead:
-			w := c.writeData
-			m := c.lastWriteMac
-		LOOP:
-			if m.p1 == readData.cid.p1 && m.p2 == readData.cid.p2 &&
-				m.p3 == readData.cid.p3 && m.p4 == readData.cid.p4 {
-
-				//
-				//
-				//
-
-				continue
-			}
-			if w != nil && w.prev != nil {
-				w = w.prev
-				m = w.mac
-
-				goto LOOP
-			}
-		}
-	}
-}
-
-func do(handlers []*handler, tlsConfig *tls.Config, strokes int,
+func do(handlers []*handler, tlsConfig *tls.Config, threads int,
 	address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
 	conn, err := net.ListenUDP("udp", address)
 	if err != nil {
@@ -135,7 +91,7 @@ func do(handlers []*handler, tlsConfig *tls.Config, strokes int,
 	var memory *tClient
 	memoryLock := make(chan *struct{}, 1)
 
-	for i := 0; i < strokes; i++ {
+	for i := 0; i < threads; i++ {
 		go func() {
 			for {
 				readData := &tReadData{
@@ -146,13 +102,9 @@ func do(handlers []*handler, tlsConfig *tls.Config, strokes int,
 				switch {
 				case readData.b[0]&0b00000000 == 0b00000000:
 					client := &tClient{
-						conn:        tls.Server(&dataport{}, tlsConfig),
-						cRead:       make(chan *tReadData, strokes),
-						cSignalRead: make(chan *tReadData),
-						memoryLock:  make(chan *struct{}, 1),
+						conn: tls.Server(&dataport{}, tlsConfig),
+						lock: make(chan *struct{}, 1),
 					}
-					go client.bypass()
-					go client.do()
 
 					bNextMac := sha256.Sum256(readData.b[1:readData.n])
 					readData.nextMac.p1 = uint64(bNextMac[0]) | uint64(bNextMac[1])<<8 | uint64(bNextMac[2])<<16 | uint64(bNextMac[3])<<24 |
@@ -210,8 +162,42 @@ func do(handlers []*handler, tlsConfig *tls.Config, strokes int,
 					readData.nextMac.p4 = uint64(bNextMac[24]) | uint64(bNextMac[25])<<8 | uint64(bNextMac[26])<<16 | uint64(bNextMac[27])<<24 |
 						uint64(bNextMac[28])<<32 | uint64(bNextMac[29])<<40 | uint64(bNextMac[30])<<48 | uint64(bNextMac[31])<<56
 
+					var client *tClient
+					memoryLock <- nil
 					if memory != nil {
-						memory.cSignalRead <- readData
+						client = memory
+						client.lock <- nil
+					}
+					<-memoryLock
+					for client != nil {
+						var next *tClient
+						if !client.drop {
+							w := client.writeData
+							m := client.lastWriteMac
+						LOOP:
+							if m.p1 == readData.cid.p1 && m.p2 == readData.cid.p2 &&
+								m.p3 == readData.cid.p3 && m.p4 == readData.cid.p4 {
+
+								//
+								//
+								//
+
+								goto FOUND
+							}
+							if w != nil && w.prev != nil {
+								w = w.prev
+								m = w.mac
+
+								goto LOOP
+							}
+						}
+						next = client.next
+						if next != nil {
+							next.lock <- nil
+						}
+					FOUND:
+						<-client.lock
+						client = next
 					}
 				}
 			}
