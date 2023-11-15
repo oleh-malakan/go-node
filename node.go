@@ -89,13 +89,6 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 				client.readData = readData
 				client.nextReadMac = readData.nextMac
 				client.drop = false
-				/*
-					go func() {
-						if err := client.conn.Handshake(); err != nil {
-
-						}
-					}()
-				*/
 
 				memoryLock <- nil
 				if memory != nil {
