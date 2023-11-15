@@ -171,6 +171,7 @@ func do(handlers []*handler, tlsConfig *tls.Config, threads int,
 					<-memoryLock
 					for client != nil {
 						var next *tClient
+
 						if !client.drop {
 							w := client.writeData
 							m := client.lastWriteMac
@@ -191,10 +192,11 @@ func do(handlers []*handler, tlsConfig *tls.Config, threads int,
 								goto LOOP
 							}
 						}
+
 						next = client.next
 						if next != nil {
 							next.lock <- nil
-						}
+						}						
 					FOUND:
 						<-client.lock
 						client = next
