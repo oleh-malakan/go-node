@@ -35,10 +35,11 @@ var (
 )
 
 type tReadData struct {
-	b     []byte
-	n     int
-	len   int
-	rAddr *net.UDPAddr
+	b      []byte
+	n      int
+	offset int
+	len    int
+	rAddr  *net.UDPAddr
 	//	mac     [32]byte
 	nextMac [32]byte
 	next    *tReadData
@@ -81,16 +82,18 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 		readData.n, readData.rAddr, readData.err = conn.ReadFromUDP(readData.b)
 
 		go func(readData *tReadData) {
-			readData.len = int(binary.LittleEndian.Uint16(readData.b[65:81])) + 81
-			if readData.len <= readData.n {
-				switch {
-				case readData.b[0]>>7&1 == 0:
+			switch {
+			case readData.b[0]>>7&1 == 0:
+				readData.offset = 17
+				readData.len = int(binary.LittleEndian.Uint16(readData.b[1:readData.offset])) + readData.offset
+				if readData.len <= readData.n {
+
 					client := &tClient{
 						conn: tls.Server(&dataport{}, tlsConfig),
 						lock: make(chan *struct{}, 1),
 					}
 
-					readData.nextMac = sha256.Sum256(readData.b[1:readData.len])
+					readData.nextMac = sha256.Sum256(readData.b[readData.offset:readData.len])
 
 					client.readData = readData
 					client.nextReadMac = readData.nextMac
@@ -104,11 +107,16 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 						memory = client
 					}
 					<-memoryLock
-				case readData.b[0]>>7&1 == 1 && memory != nil:
+				}
+			case readData.b[0]>>7&1 == 1 && memory != nil:
+				readData.offset = 81
+				readData.len = int(binary.LittleEndian.Uint16(readData.b[65:readData.offset])) + readData.offset
+				if readData.len <= readData.n {
+
 					/*
 						readData.mac = readData.b[33:65]
 					*/
-					readData.nextMac = sha256.Sum256(readData.b[81:readData.len])
+					readData.nextMac = sha256.Sum256(readData.b[readData.offset:readData.len])
 					var client *tClient
 					memoryLock <- nil
 					if memory != nil {
@@ -152,6 +160,7 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 					}
 				}
 			}
+
 		}(readData)
 	}
 }
