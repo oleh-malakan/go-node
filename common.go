@@ -19,19 +19,9 @@ func (c *Connection) Close() error {
 	return nil
 }
 
-type tError struct {
-	text string
-}
-
-func (e *tError) Error() string {
-	return e.text
-}
-
-func newError(text string) *tError {
-	return &tError{text}
-}
-
 type dataport struct {
+	cRead chan []byte
+	cWrite chan []byte
 }
 
 func (d *dataport) Read(b []byte) (n int, err error) {

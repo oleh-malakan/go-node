@@ -3,6 +3,8 @@ package node
 import (
 	"crypto/sha256"
 	"crypto/tls"
+	"encoding/binary"
+	"errors"
 	"net"
 )
 
@@ -17,7 +19,7 @@ func Handler(nodeID string, f func(query []byte, connection *Connection)) {
 
 func Do(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
 	if tlsConfig == nil {
-		return newError("require tls config")
+		return errors.New("require tls config")
 	}
 
 	return do(handlers, tlsConfig, address, nodeAddresses...)
@@ -33,9 +35,10 @@ var (
 )
 
 type tReadData struct {
-	b     []byte
-	n     int
-	rAddr *net.UDPAddr
+	b      []byte
+	n      int
+	offset int
+	rAddr  *net.UDPAddr
 	//	mac     [32]byte
 	nextMac [32]byte
 	next    *tReadData
@@ -79,12 +82,17 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 
 		go func(readData *tReadData) {
 			switch {
-			case readData.b[0]&0b00000000 == 0b00000000:
+			case readData.b[0]>>7&1 == 0:
 				client := &tClient{
 					conn: tls.Server(&dataport{}, tlsConfig),
 					lock: make(chan *struct{}, 1),
 				}
-				readData.nextMac = sha256.Sum256(readData.b[1:readData.n])
+
+				if readData.b[0]&1 == 0 {
+					readData.n = int(binary.LittleEndian.Uint16(readData.b[1:17]))
+					readData.offset = 16
+				}
+				readData.nextMac = sha256.Sum256(readData.b[1+readData.offset : readData.n])
 
 				client.readData = readData
 				client.nextReadMac = readData.nextMac
@@ -98,11 +106,15 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 					memory = client
 				}
 				<-memoryLock
-			case readData.b[0]&0b10000000 == 0b10000000 && memory != nil:
+			case readData.b[0]>>7&1 == 1 && memory != nil:
 				/*
 					readData.mac = readData.b[33:65]
 				*/
-				readData.nextMac = sha256.Sum256(readData.b[65:readData.n])
+				if readData.b[0]&1 == 0 {
+					readData.n = int(binary.LittleEndian.Uint16(readData.b[65:81]))
+					readData.offset = 16
+				}
+				readData.nextMac = sha256.Sum256(readData.b[65+readData.offset : readData.n])
 				var client *tClient
 				memoryLock <- nil
 				if memory != nil {
