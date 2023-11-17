@@ -123,13 +123,14 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 													next := current.next
 													current.next = readData
 													readData.next = next
-													if readData.nextOk = compareID(readData.nextMac[0:32], readData.next.b[33:65]); readData.nextOk {
-														r = readData.nextOk
-													}													
+													current = readData
 												}
 											}
 											if !r {
-												
+												if r = compareID(readData.nextMac[0:32], current.next.b[33:65]); r {
+													readData.nextOk = true
+													readData.next = current.next																									
+												}																							
 											}
 										}
 									}
