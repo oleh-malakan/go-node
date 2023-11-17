@@ -114,11 +114,11 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 								client.lastReadData.nextOk = compareID(client.lastReadData.nextMac[0:32], readData.b[33:65])
 								if !client.lastReadData.nextOk {
 									current := client.readData
-									var l, r bool
-									for current != nil && (!l || !r) {
+									var l, r *tReadData
+									for current != nil && (l == nil || r == nil) {
 										if current.next !=nil && !current.nextOk {
-											if !l {
-												if l = compareID(current.nextMac[0:32], readData.b[33:65]); l {
+											if l == nil {
+												if ok := compareID(current.nextMac[0:32], readData.b[33:65]); ok {
 													current.nextOk = true
 													next := current.next
 													current.next = readData
@@ -126,8 +126,8 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 													current = readData
 												}
 											}
-											if !r {
-												if r = compareID(readData.nextMac[0:32], current.next.b[33:65]); r {
+											if r == nil {
+												if ok := compareID(readData.nextMac[0:32], current.next.b[33:65]); ok {
 													readData.nextOk = true
 													readData.next = current.next																									
 												}																							
