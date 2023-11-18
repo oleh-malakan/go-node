@@ -125,7 +125,8 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 								if client.lastReadData.nextOk = compareID(client.lastReadData.nextMac[0:32], readData.b[33:65]); client.lastReadData.nextOk {
 									client.lastReadData.next = readData
 									client.lastReadData = client.lastReadData.next
-									for i := 0; i < len(client.heap); i++ {
+									l := len(client.heap)
+									for i := 0; i < l; i++ {
 										h := <-client.heap
 										if client.lastReadData.nextOk = compareID(client.lastReadData.nextMac[0:32], h.readData.b[33:65]); client.lastReadData.nextOk {
 											client.lastReadData.next = h.readData
