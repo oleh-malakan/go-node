@@ -114,30 +114,41 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 								client.lastReadData.nextOk = compareID(client.lastReadData.nextMac[0:32], readData.b[33:65])
 								if !client.lastReadData.nextOk {
 									current := client.readData
-									var l, r bool
-									for current != nil && (!l || !r) {
-										if current.next !=nil && !current.nextOk {
-											if !l {
-												if l = compareID(current.nextMac[0:32], readData.b[33:65]); l {
-													current.nextOk = true
-													next := current.next
+									var l, r *tReadData
+									for current != nil && (l == nil || r == nil) {
+										if current.next != nil {
+											if r == nil && !current.nextOk {
+												if current.nextOk = compareID(current.nextMac[0:32], readData.b[33:65]); current.nextOk {
+													r = current.next
 													current.next = readData
-													readData.next = next
-													current = readData
+													if l != nil {
+														break
+													}
+													if readData.nextOk = compareID(readData.nextMac[0:32], r.b[33:65]); readData.nextOk {
+														readData.next = r
+														readData = nil
+														break
+													} else {
+														current = r
+													}
 												}
 											}
-											if !r {
-												if r = compareID(readData.nextMac[0:32], current.next.b[33:65]); r {
-													readData.nextOk = true
-													readData.next = current.next																									
-												}																							
+											if l == nil && !current.nextOk {
+												if readData.nextOk = compareID(readData.nextMac[0:32], current.next.b[33:65]); readData.nextOk {
+													l = current
+													readData.next = current.next
+													if r != nil {
+														break
+													}
+												}
 											}
 										}
+										current = current.next
 									}
-
-									//readData = nil
 								}
+
 								if readData != nil {
+
 									client.lastReadData.next = readData
 									client.lastReadData = readData
 								}
