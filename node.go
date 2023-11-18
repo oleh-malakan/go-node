@@ -113,44 +113,6 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 							if compareID(w.mac[0:32], readData.b[1:33]) {
 								client.lastReadData.nextOk = compareID(client.lastReadData.nextMac[0:32], readData.b[33:65])
 								if !client.lastReadData.nextOk {
-									current := client.readData
-									var l, r *tReadData
-									for current != nil && (l == nil || r == nil) {
-										if current.next != nil {
-											if r == nil && !current.nextOk {
-												if current.nextOk = compareID(current.nextMac[0:32], readData.b[33:65]); current.nextOk {
-													r = current.next
-													current.next = readData
-													if l != nil {
-														break
-													}
-													if readData.nextOk = compareID(readData.nextMac[0:32], r.b[33:65]); readData.nextOk {
-														readData.next = r
-														readData = nil
-														break
-													} else {
-														current = r
-													}
-												}
-											}
-											if l == nil && !current.nextOk {
-												if readData.nextOk = compareID(readData.nextMac[0:32], current.next.b[33:65]); readData.nextOk {
-													l = current
-													readData.next = current.next
-													if r != nil {
-														break
-													}
-												}
-											}
-										}
-										current = current.next
-									}
-								}
-
-								if readData != nil {
-
-									client.lastReadData.next = readData
-									client.lastReadData = readData
 								}
 
 								next = nil
