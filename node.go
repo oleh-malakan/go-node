@@ -138,10 +138,16 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 										}
 									}
 								} else {
-									client.heap <- &tHeap{
+									h := &tHeap{
 										readData: readData,
 										time:     time.Now().UnixNano(),
 										timeout:  client.heapTimeout,
+									}
+									select {
+									case client.heap <- h:
+									default:
+										<-client.heap
+										client.heap <- h
 									}
 								}
 
