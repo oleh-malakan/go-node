@@ -52,18 +52,11 @@ type tWriteData struct {
 	prev *tWriteData
 }
 
-type tHeap struct {
-	readData *tReadData
-	time     int64
-	timeout  int64
-}
-
 type tClient struct {
 	conn         *tls.Conn
 	lastReadData *tReadData
 	readData     *tReadData
-	heap         chan *tHeap
-	heapTimeout  int64
+	heap         *tHeap
 	writeData    *tWriteData
 	next         *tClient
 	lock         chan *struct{}
@@ -90,10 +83,12 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 			case readData.b[0]>>7&1 == 0:
 				readData.nextMac = sha256.Sum256(readData.b[1:readData.n])
 				client := &tClient{
-					conn:        tls.Server(&dataport{}, tlsConfig),
-					lock:        make(chan *struct{}, 1),
-					heap:        make(chan *tHeap, 512),
-					heapTimeout: int64(time.Duration(50) * time.Millisecond),
+					conn: tls.Server(&dataport{}, tlsConfig),
+					lock: make(chan *struct{}, 1),
+					heap: &tHeap{
+						cap:     512,
+						timeout: int64(time.Duration(50) * time.Millisecond),
+					},
 				}
 				client.readData = readData
 				client.lastReadData = readData
@@ -124,31 +119,11 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 							if compareID(w.mac[0:32], readData.b[1:33]) {
 								if client.lastReadData.nextOk = compareID(client.lastReadData.nextMac[0:32], readData.b[33:65]); client.lastReadData.nextOk {
 									client.lastReadData.next = readData
-									client.lastReadData = client.lastReadData.next
-									l := len(client.heap)
-									for i := 0; i < l; i++ {
-										h := <-client.heap
-										if client.lastReadData.nextOk = compareID(client.lastReadData.nextMac[0:32], h.readData.b[33:65]); client.lastReadData.nextOk {
-											client.lastReadData.next = h.readData
-											client.lastReadData = client.lastReadData.next
-										} else {
-											if time.Now().UnixNano() < h.time+h.timeout {
-												client.heap <- h
-											}
-										}
-									}
+									client.lastReadData = readData
+									client.lastReadData.next = client.heap.find(readData.nextMac[0:32])
+									client.lastReadData.nextOk = client.lastReadData.next != nil
 								} else {
-									h := &tHeap{
-										readData: readData,
-										time:     time.Now().UnixNano(),
-										timeout:  client.heapTimeout,
-									}
-									select {
-									case client.heap <- h:
-									default:
-										<-client.heap
-										client.heap <- h
-									}
+									client.heap.put(readData)
 								}
 
 								next = nil

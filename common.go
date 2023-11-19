@@ -66,3 +66,55 @@ func compareID(a []byte, b []byte) bool {
 		a[24] == b[24] && a[25] == b[25] && a[26] == b[26] && a[27] == b[27] &&
 		a[28] == b[28] && a[29] == b[29] && a[30] == b[30] && a[31] == b[31]
 }
+
+type tHeapItem struct {
+	readData *tReadData
+	next     int
+	time     int64
+	timeout  int64
+}
+
+type tHeap struct {
+	heap    []*tHeapItem
+	next    int
+	cap     int
+	timeout int64
+	current int
+}
+
+func (h *tHeap) put(r *tReadData) {
+	if h.cap <= len(h.heap) {
+		h.heap = h.heap[1:len(h.heap)]
+	}
+	h.heap = append(h.heap, &tHeapItem{
+		readData: r,
+		time:     time.Now().UnixNano(),
+		timeout:  h.timeout,
+	})
+}
+
+func (h *tHeap) find(b []byte) *tReadData {
+	/*
+		for i := 0; i < len(client.heap); i++ {
+			if client.lastReadData.nextOk = compareID(client.lastReadData.nextMac[0:32], client.heap[i].readData.b[33:65]); client.lastReadData.nextOk {
+				client.lastReadData.next = client.heap[i].readData
+				client.lastReadData = client.lastReadData.next
+				client.deleteHeap(i)
+			} else {
+				if time.Now().UnixNano() < client.heap[i].time+client.heap[i].timeout {
+					//client.heap <- h
+				}
+			}
+		}
+	*/
+
+	return nil
+}
+
+/*
+func (h *tHeap) delete() {
+	t := h.heap[0 : h.current+1]
+	t = append(t, h.heap[h.current:len(h.heap)]...)
+	h.heap = t
+}
+*/
