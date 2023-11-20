@@ -27,15 +27,11 @@ func (t *tHeap) Put(r *tReadData) {
 			t.heap[t.index[i]].time = time.Now().UnixNano()
 			return
 		}
-		if t.heap[t.index[i]].prev < 0 {
-			if compareID(r.nextMac[0:32], t.heap[t.index[i]].readData.b[33:65]) {
-				next = t.index[i]
-			}
+		if t.heap[t.index[i]].prev < 0 && compareID(r.nextMac[0:32], t.heap[t.index[i]].readData.b[33:65]) {
+			next = t.index[i]
 		}
-		if t.heap[t.index[i]].next < 0 {
-			if compareID(t.heap[t.index[i]].readData.nextMac[0:32], r.b[33:65]) {
-				prev = t.index[i]
-			}
+		if t.heap[t.index[i]].next < 0 && compareID(t.heap[t.index[i]].readData.nextMac[0:32], r.b[33:65]) {
+			prev = t.index[i]
 		}
 	}
 
