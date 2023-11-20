@@ -35,23 +35,24 @@ func Dial(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Client, error)
 }
 
 func (c *Client) dial(nodeAddresses ...*net.UDPAddr) error {
-	conn, err := net.DialUDP("udp", nil, nodeAddresses[0])
-	if err != nil {
-		return err
-	}
-
-	go c.handshake()
-
-	go func() {	
-		for {
-			select {
-			case b := <-c.cWrite:
-
-			}
+	/*
+		conn, err := net.DialUDP("udp", nil, nodeAddresses[0])
+		if err != nil {
+			return err
 		}
 
-	}()
+		go c.handshake()
 
+		go func() {
+			for {
+				select {
+				case b := <-c.cWrite:
+
+				}
+			}
+
+		}()
+	*/
 	return nil
 }
 

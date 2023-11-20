@@ -1,59 +1,22 @@
 package node
 
-import (
-	"net"
-	"time"
-)
+import "net"
 
-type Connection struct{}
-
-func (c *Connection) Send(b []byte) error {
-	return nil
+type tReadData struct {
+	b      []byte
+	n      int
+	readed int
+	rAddr  *net.UDPAddr
+	//	mac     [32]byte
+	nextMac [32]byte
+	next    *tReadData
+	err     error
 }
 
-func (c *Connection) Receive() ([]byte, error) {
-	return nil, nil
-}
-
-func (c *Connection) Close() error {
-	return nil
-}
-
-type dataport struct {
-	cRead  chan []byte
-	cWrite chan []byte
-}
-
-func (d *dataport) Read(b []byte) (n int, err error) {
-	return
-}
-
-func (d *dataport) Write(b []byte) (n int, err error) {
-	return
-}
-
-func (d *dataport) Close() error {
-	return nil
-}
-
-func (d *dataport) LocalAddr() net.Addr {
-	return nil
-}
-
-func (d *dataport) RemoteAddr() net.Addr {
-	return nil
-}
-
-func (d *dataport) SetDeadline(t time.Time) error {
-	return nil
-}
-
-func (d *dataport) SetReadDeadline(t time.Time) error {
-	return nil
-}
-
-func (d *dataport) SetWriteDeadline(t time.Time) error {
-	return nil
+type tWriteData struct {
+	//prevMac [32]byte
+	mac  [32]byte
+	prev *tWriteData
 }
 
 func compareID(a []byte, b []byte) bool {
@@ -66,55 +29,3 @@ func compareID(a []byte, b []byte) bool {
 		a[24] == b[24] && a[25] == b[25] && a[26] == b[26] && a[27] == b[27] &&
 		a[28] == b[28] && a[29] == b[29] && a[30] == b[30] && a[31] == b[31]
 }
-
-type tHeapItem struct {
-	readData *tReadData
-	next     int
-	time     int64
-	timeout  int64
-}
-
-type tHeap struct {
-	heap    []*tHeapItem
-	next    int
-	cap     int
-	timeout int64
-	current int
-}
-
-func (h *tHeap) put(r *tReadData) {
-	if h.cap <= len(h.heap) {
-		h.heap = h.heap[1:len(h.heap)]
-	}
-	h.heap = append(h.heap, &tHeapItem{
-		readData: r,
-		time:     time.Now().UnixNano(),
-		timeout:  h.timeout,
-	})
-}
-
-func (h *tHeap) find(b []byte) *tReadData {
-	/*
-		for i := 0; i < len(client.heap); i++ {
-			if client.lastReadData.nextOk = compareID(client.lastReadData.nextMac[0:32], client.heap[i].readData.b[33:65]); client.lastReadData.nextOk {
-				client.lastReadData.next = client.heap[i].readData
-				client.lastReadData = client.lastReadData.next
-				client.deleteHeap(i)
-			} else {
-				if time.Now().UnixNano() < client.heap[i].time+client.heap[i].timeout {
-					//client.heap <- h
-				}
-			}
-		}
-	*/
-
-	return nil
-}
-
-/*
-func (h *tHeap) delete() {
-	t := h.heap[0 : h.current+1]
-	t = append(t, h.heap[h.current:len(h.heap)]...)
-	h.heap = t
-}
-*/

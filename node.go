@@ -34,24 +34,6 @@ var (
 	handlers []*handler
 )
 
-type tReadData struct {
-	b      []byte
-	n      int
-	readed int
-	rAddr  *net.UDPAddr
-	//	mac     [32]byte
-	nextMac [32]byte
-	next    *tReadData
-	nextOk  bool
-	err     error
-}
-
-type tWriteData struct {
-	//prevMac [32]byte
-	mac  [32]byte
-	prev *tWriteData
-}
-
 type tClient struct {
 	conn         *tls.Conn
 	lastReadData *tReadData
@@ -117,13 +99,15 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 						w := client.writeData
 						for w != nil {
 							if compareID(w.mac[0:32], readData.b[1:33]) {
-								if client.lastReadData.nextOk = compareID(client.lastReadData.nextMac[0:32], readData.b[33:65]); client.lastReadData.nextOk {
+								if compareID(client.lastReadData.nextMac[0:32], readData.b[33:65]) {
 									client.lastReadData.next = readData
 									client.lastReadData = readData
-									client.lastReadData.next = client.heap.find(readData.nextMac[0:32])
-									client.lastReadData.nextOk = client.lastReadData.next != nil
+									var last *tReadData
+									if client.lastReadData.next, last = client.heap.Find(readData.nextMac[0:32]); client.lastReadData.next != nil {
+										client.lastReadData = last
+									}
 								} else {
-									client.heap.put(readData)
+									client.heap.Put(readData)
 								}
 
 								next = nil
