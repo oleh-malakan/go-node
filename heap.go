@@ -96,12 +96,12 @@ func (t *tHeap) Find(nextMac []byte) (next, last *tReadData) {
 		if compareID(nextMac, heap.readData.b[33:65]) {
 			next = heap.readData
 			last = next
-			//t.heap[index] = nil
+			t.delete(heap)
 			index := heap.indexNext
 			for index != nil {
 				last.next = index.readData
 				last = last.next
-				//t.heap[t.index[i]] = nil
+				t.delete(index)
 				index = index.indexNext
 			}
 		}
@@ -111,14 +111,18 @@ func (t *tHeap) Find(nextMac []byte) (next, last *tReadData) {
 }
 
 func (t *tHeap) delete(heapItem *tHeapItem) {
-	if heapItem.prev != nil {
-		heapItem.prev = heapItem.next
-		if heapItem.next == nil {
-			t.last = heapItem.prev
+	if heapItem != nil {
+		if heapItem.prev != nil {
+			heapItem.prev.next = heapItem.next
+			if heapItem.next == nil {
+				t.last = heapItem.prev
+			}
+		} else {
+			t.heap = heapItem.next
+			if t.heap == nil {
+				t.last = nil
+			}
 		}
-	} else {
-		t.heap = heapItem.next
-
+		t.len--
 	}
-
 }
