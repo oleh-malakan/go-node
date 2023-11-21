@@ -15,7 +15,7 @@ type tHeap struct {
 	heap    *tHeapItem
 	last    *tHeapItem
 	len     int
-	cap     int
+	cap     int // required > 0
 	timeout int64
 }
 
@@ -30,7 +30,7 @@ func (t *tHeap) Put(r *tReadData) {
 			heap.time = time.Now().UnixNano()
 			return
 		}
-		if heap.indexNext == nil && compareID(r.nextMac[0:32], heap.readData.b[33:65]) {
+		if indexNext == nil && compareID(r.nextMac[0:32], heap.readData.b[33:65]) {
 			indexNext = heap
 		}
 		if indexPrev == nil && compareID(heap.readData.nextMac[0:32], r.b[33:65]) {
@@ -53,6 +53,7 @@ func (t *tHeap) Put(r *tReadData) {
 
 LOOP:
 	if t.last != nil {
+		// error
 		if t.cap <= t.len {
 			t.len--
 			if t.last.prev != nil {
@@ -75,6 +76,7 @@ LOOP:
 				t.last = heap
 			}
 		} else {
+			heapItem.prev = t.last
 			t.last.next = heapItem
 			t.last = heapItem
 		}
@@ -105,6 +107,7 @@ func (t *tHeap) Find(nextMac []byte) (next, last *tReadData) {
 				index = index.indexNext
 			}
 		}
+		heap = heap.next
 	}
 
 	return

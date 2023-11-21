@@ -103,7 +103,8 @@ func do(handlers []*handler, tlsConfig *tls.Config, address *net.UDPAddr, nodeAd
 									client.lastReadData.next = readData
 									client.lastReadData = readData
 									var last *tReadData
-									if client.lastReadData.next, last = client.heap.Find(readData.nextMac[0:32]); client.lastReadData.next != nil {
+									client.lastReadData.next, last = client.heap.Find(readData.nextMac[0:32])
+									if last != nil {
 										client.lastReadData = last
 									}
 								} else {
