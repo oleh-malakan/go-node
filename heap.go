@@ -2,46 +2,62 @@ package node
 
 import "time"
 
-type tHeapItem struct {
+type tHeapReadData struct {
 	readData *tReadData
-	prev     int
-	next     int
+	prev     *tHeapItem
+	next     *tHeapItem
 	time     int64
 	timeout  int64
 }
 
+type tHeapItem struct {
+	data *tHeapReadData
+	next *tHeapItem
+}
+
 type tHeap struct {
-	heap             []*tHeapItem
-	index            []int
-	freeIndex        []int
-	prepareFreeIndex []int
-	cap              int
-	timeout          int64
+	heap    *tHeapItem
+	len     int
+	cap     int
+	timeout int64
 }
 
 func (t *tHeap) Put(r *tReadData) {
-	prev := -1
-	next := -1
-	for i := 0; i < len(t.index) && (prev < 0 || next < 0); i++ {
-		if compareID(r.b[33:65], t.heap[t.index[i]].readData.b[33:65]) {
-			t.heap[t.index[i]].time = time.Now().UnixNano()
+	var (
+		prev *tHeapItem
+		next *tHeapItem
+	)
+	heap := t.heap
+	for heap != nil && (prev == nil || next == nil) {
+		if compareID(r.b[33:65], heap.data.readData.b[33:65]) {
+			heap.data.time = time.Now().UnixNano()
 			return
 		}
-		if t.heap[t.index[i]].prev < 0 && compareID(r.nextMac[0:32], t.heap[t.index[i]].readData.b[33:65]) {
-			next = t.index[i]
+		if heap.data.prev == nil && compareID(r.nextMac[0:32], heap.data.readData.b[33:65]) {
+			next = heap
 		}
-		if t.heap[t.index[i]].next < 0 && compareID(t.heap[t.index[i]].readData.nextMac[0:32], r.b[33:65]) {
-			prev = t.index[i]
+		if heap.data.next == nil && compareID(heap.data.readData.nextMac[0:32], r.b[33:65]) {
+			prev = heap
 		}
+		heap = heap.next
 	}
 
-	t.heap[t.indexNext()] = &tHeapItem{
-		readData: r,
-		prev:     prev,
-		next:     next,
-		time:     time.Now().UnixNano(),
-		timeout:  t.timeout,
+	heapItem := &tHeapItem{
+		data: &tHeapReadData{
+			readData: r,
+			prev:     prev,
+			next:     next,
+			time:     time.Now().UnixNano(),
+			timeout:  t.timeout,
+		},
 	}
+
+	if heap.next != nil {
+
+	} else {
+		heap.next = heapItem
+	}
+
 }
 
 func (t *tHeap) Find(nextMac []byte) (next, last *tReadData) {
@@ -63,54 +79,4 @@ func (t *tHeap) Find(nextMac []byte) (next, last *tReadData) {
 	}
 
 	return
-}
-
-func (t *tHeap) indexNext() (index int) {
-	if len(t.freeIndex) > 0 {
-		index = t.freeIndex[0]
-		t.freeIndex = t.freeIndex[1:len(t.freeIndex)]
-		t.indexPut(index)
-	} else if len(t.heap) == 0 {
-		t.heap = append(t.heap, nil)
-		t.indexPut(index)
-	} else if index = len(t.heap); index < t.cap {
-		t.heap = append(t.heap, nil)
-		t.indexPut(index)
-	} else {
-		index = len(t.heap) - 1
-		if t.heap[index].next >= 0 {
-			t.heap[t.heap[index].next].prev = -1
-		}
-		if t.heap[index].prev >= 0 {
-			t.heap[t.heap[index].prev].next = -1
-		}
-	}
-
-	return
-}
-
-func (t *tHeap) indexPut(index int) {
-	t.index = t.arrayPutIndex(t.index, index)
-}
-
-func (t *tHeap) indexPrepareFree(index int) {
-	t.prepareFreeIndex = t.arrayPutIndex(t.prepareFreeIndex, index)
-}
-
-func (t *tHeap) indexFree() {
-
-	t.prepareFreeIndex = nil
-}
-
-func (t *tHeap) arrayPutIndex(arr []int, index int) []int {
-	var min int
-	for min = 0; min < len(arr) && arr[min] < index; min++ {
-	}
-
-	var new []int
-	new = append(new, arr[:min]...)
-	new = append(new, index)
-	new = append(new, arr[min:]...)
-
-	return new
 }
