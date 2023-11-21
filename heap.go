@@ -9,11 +9,11 @@ type tHeapItem struct {
 	timeout   int64
 	next      *tHeapItem
 	prev      *tHeapItem
-	last      *tHeapItem
 }
 
 type tHeap struct {
 	heap    *tHeapItem
+	last    *tHeapItem
 	len     int
 	cap     int
 	timeout int64
@@ -51,28 +51,42 @@ func (t *tHeap) Put(r *tReadData) {
 		timeout:   t.timeout,
 	}
 
-	if t.cap <= t.len && t.heap.last != nil && t.heap.last.prev != nil {
-		t.heap.last = t.heap.last.prev
-		t.heap.last.next = nil
-	}
-
-	if indexPrev != nil {
-		indexPrev.indexNext = heapItem
-	}
-
-	if heap != nil {
-		if heap.next != nil {
-			heap.next.prev = heapItem
-			heapItem.next = heap.next
+LOOP:
+	if t.last != nil {
+		if t.cap <= t.len {
+			t.len--
+			if t.last.prev != nil {
+				t.last = t.last.prev
+				t.last.next = nil
+			} else {
+				t.last = nil
+				goto LOOP
+			}
 		}
-		heap.next = heapItem
-		heapItem.prev = heap
-		if heap.next == nil {
-			
+
+		if heap != nil {
+			if heap.next != nil {
+				heap.next.prev = heapItem
+				heapItem.next = heap.next
+			}
+			heap.next = heapItem
+			heapItem.prev = heap
+			if heap.next == nil {
+				t.last = heap
+			}
+		} else {
+			t.last.next = heapItem
+			t.last = heapItem
+		}
+
+		if indexPrev != nil {
+			indexPrev.indexNext = heapItem
 		}
 	} else {
-
+		t.heap = heapItem
+		t.last = heapItem
 	}
+
 	t.len++
 }
 
@@ -94,4 +108,17 @@ func (t *tHeap) Find(nextMac []byte) (next, last *tReadData) {
 	}
 
 	return
+}
+
+func (t *tHeap) delete(heapItem *tHeapItem) {
+	if heapItem.prev != nil {
+		heapItem.prev = heapItem.next
+		if heapItem.next == nil {
+			t.last = heapItem.prev
+		}
+	} else {
+		t.heap = heapItem.next
+
+	}
+
 }
