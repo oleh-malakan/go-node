@@ -4,7 +4,7 @@ import "time"
 
 type tHeapItem struct {
 	readData  *tReadData
-	nextIndex *tHeapItem
+	indexNext *tHeapItem
 	time      int64
 	timeout   int64
 	next      *tHeapItem
@@ -20,23 +20,23 @@ type tHeap struct {
 
 func (t *tHeap) Put(r *tReadData) {
 	var (
-		prevIndex *tHeapItem
-		nextIndex *tHeapItem
+		indexPrev *tHeapItem
+		indexNext *tHeapItem
 	)
 	heap := t.heap
-	for heap != nil && (prevIndex == nil || nextIndex == nil) {
+	for heap != nil && (indexPrev == nil || indexNext == nil) {
 		if compareID(r.b[33:65], heap.readData.b[33:65]) {
 			heap.time = time.Now().UnixNano()
 			return
 		}
-		if heap.nextIndex == nil && compareID(r.nextMac[0:32], heap.readData.b[33:65]) {
-			nextIndex = heap
+		if heap.indexNext == nil && compareID(r.nextMac[0:32], heap.readData.b[33:65]) {
+			indexNext = heap
 		}
-		if prevIndex == nil && compareID(heap.readData.nextMac[0:32], r.b[33:65]) {
-			prevIndex = heap
-			if prevIndex.nextIndex != nil {
-				prevIndex.nextIndex.time = time.Now().UnixNano()
-				return	
+		if indexPrev == nil && compareID(heap.readData.nextMac[0:32], r.b[33:65]) {
+			indexPrev = heap
+			if indexPrev.indexNext != nil {
+				indexPrev.indexNext.time = time.Now().UnixNano()
+				return
 			}
 		}
 
@@ -45,18 +45,17 @@ func (t *tHeap) Put(r *tReadData) {
 
 	heapItem := &tHeapItem{
 		readData:  r,
-		nextIndex: nextIndex,
+		indexNext: indexNext,
 		time:      time.Now().UnixNano(),
 		timeout:   t.timeout,
 	}
-
 
 	if t.cap <= t.len {
 
 	}
 
-	if prevIndex != nil {
-		prevIndex.nextIndex = heapItem
+	if indexPrev != nil {
+		indexPrev.indexNext = heapItem
 	}
 
 	if heap != nil {
@@ -76,16 +75,15 @@ func (t *tHeap) Find(nextMac []byte) (next, last *tReadData) {
 	heap := t.heap
 	for heap != nil {
 		if compareID(nextMac, heap.readData.b[33:65]) {
-
-			index := heap
-			next = index.readData
+			next = heap.readData
 			last = next
-
 			//t.heap[index] = nil
-			for index = t.heap[index].next; index >= 0; {
-				last.next = t.heap[index].readData
+			index := heap.indexNext
+			for index != nil {
+				last.next = index.readData
 				last = last.next
 				//t.heap[t.index[i]] = nil
+				index = index.indexNext
 			}
 		}
 	}
