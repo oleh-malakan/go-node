@@ -9,6 +9,7 @@ type tHeapItem struct {
 	timeout   int64
 	next      *tHeapItem
 	prev      *tHeapItem
+	last      *tHeapItem
 }
 
 type tHeap struct {
@@ -50,8 +51,9 @@ func (t *tHeap) Put(r *tReadData) {
 		timeout:   t.timeout,
 	}
 
-	if t.cap <= t.len {
-
+	if t.cap <= t.len && t.heap.last != nil && t.heap.last.prev != nil {
+		t.heap.last = t.heap.last.prev
+		t.heap.last.next = nil
 	}
 
 	if indexPrev != nil {
@@ -65,10 +67,13 @@ func (t *tHeap) Put(r *tReadData) {
 		}
 		heap.next = heapItem
 		heapItem.prev = heap
-		t.len++
+		if heap.next == nil {
+			
+		}
 	} else {
 
 	}
+	t.len++
 }
 
 func (t *tHeap) Find(nextMac []byte) (next, last *tReadData) {
