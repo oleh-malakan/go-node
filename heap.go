@@ -2,17 +2,13 @@ package node
 
 import "time"
 
-type tHeapReadData struct {
-	readData *tReadData
-	prev     *tHeapItem
-	next     *tHeapItem
-	time     int64
-	timeout  int64
-}
-
 type tHeapItem struct {
-	data *tHeapReadData
-	next *tHeapItem
+	readData  *tReadData
+	nextIndex *tHeapItem
+	time      int64
+	timeout   int64
+	next      *tHeapItem
+	prev      *tHeapItem
 }
 
 type tHeap struct {
@@ -24,57 +20,73 @@ type tHeap struct {
 
 func (t *tHeap) Put(r *tReadData) {
 	var (
-		prev *tHeapItem
-		next *tHeapItem
+		prevIndex *tHeapItem
+		nextIndex *tHeapItem
 	)
 	heap := t.heap
-	for heap != nil && (prev == nil || next == nil) {
-		if compareID(r.b[33:65], heap.data.readData.b[33:65]) {
-			heap.data.time = time.Now().UnixNano()
+	for heap != nil && (prevIndex == nil || nextIndex == nil) {
+		if compareID(r.b[33:65], heap.readData.b[33:65]) {
+			heap.time = time.Now().UnixNano()
 			return
 		}
-		if heap.data.prev == nil && compareID(r.nextMac[0:32], heap.data.readData.b[33:65]) {
-			next = heap
+		if heap.nextIndex == nil && compareID(r.nextMac[0:32], heap.readData.b[33:65]) {
+			nextIndex = heap
 		}
-		if heap.data.next == nil && compareID(heap.data.readData.nextMac[0:32], r.b[33:65]) {
-			prev = heap
+		if prevIndex == nil && compareID(heap.readData.nextMac[0:32], r.b[33:65]) {
+			prevIndex = heap
+			if prevIndex.nextIndex != nil {
+				prevIndex.nextIndex.time = time.Now().UnixNano()
+				return	
+			}
 		}
+
 		heap = heap.next
 	}
 
 	heapItem := &tHeapItem{
-		data: &tHeapReadData{
-			readData: r,
-			prev:     prev,
-			next:     next,
-			time:     time.Now().UnixNano(),
-			timeout:  t.timeout,
-		},
+		readData:  r,
+		nextIndex: nextIndex,
+		time:      time.Now().UnixNano(),
+		timeout:   t.timeout,
 	}
 
-	if heap.next != nil {
 
-	} else {
+	if t.cap <= t.len {
+
+	}
+
+	if prevIndex != nil {
+		prevIndex.nextIndex = heapItem
+	}
+
+	if heap != nil {
+		if heap.next != nil {
+			heap.next.prev = heapItem
+			heapItem.next = heap.next
+		}
 		heap.next = heapItem
-	}
+		heapItem.prev = heap
+		t.len++
+	} else {
 
+	}
 }
 
 func (t *tHeap) Find(nextMac []byte) (next, last *tReadData) {
-	for i := 0; i < len(t.index) && next == nil; i++ {
-		if compareID(nextMac, t.heap[t.index[i]].readData.b[33:65]) {
-			index := t.index[i]
-			next = t.heap[index].readData
+	heap := t.heap
+	for heap != nil {
+		if compareID(nextMac, heap.readData.b[33:65]) {
+
+			index := heap
+			next = index.readData
 			last = next
-			t.heap[index] = nil
-			t.indexPrepareFree(index)
+
+			//t.heap[index] = nil
 			for index = t.heap[index].next; index >= 0; {
 				last.next = t.heap[index].readData
 				last = last.next
-				t.heap[t.index[i]] = nil
-				t.indexPrepareFree(index)
+				//t.heap[t.index[i]] = nil
 			}
-			t.indexFree()
 		}
 	}
 
