@@ -12,7 +12,7 @@ type Client struct {
 	cWrite chan []byte
 }
 
-func (c *Client) Connect(nodeID string, query []byte) (*Connection, error) {
+func (c *Client) Connect(nodeID string) (*Connection, error) {
 	return &Connection{}, nil
 }
 

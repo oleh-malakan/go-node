@@ -15,7 +15,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	connection, err := client.Connect("Hello, World!", nil)
+	connection, err := client.Connect("Hello, World!")
 	if err != nil {
 		log.Print(err)
 
