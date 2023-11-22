@@ -101,12 +101,16 @@ func (t *tHeap) find(nextMac []byte) (next, last *tReadData) {
 		if heapItem != nil {
 			if heapItem.prev != nil {
 				heapItem.prev.next = heapItem.next
-				if heapItem.next == nil {
+				if heapItem.next != nil {
+					heapItem.next.prev = heapItem.prev
+				} else {
 					t.last = heapItem.prev
 				}
 			} else {
 				t.heap = heapItem.next
-				if t.heap == nil {
+				if t.heap != nil {
+					t.heap.prev = nil
+				} else {
 					t.last = nil
 				}
 			}

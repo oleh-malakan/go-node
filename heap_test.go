@@ -126,3 +126,23 @@ func TestHeapCap5(t *testing.T) {
 		t.Fatal("heap not nil")
 	}
 }
+
+func TestHeap1(t *testing.T) {
+	heap := tHeap{
+		cap: 512,
+	}
+
+	if heap.heap != nil {
+		t.Fatal("heap not nil")
+	}
+}
+
+func TestHeap2(t *testing.T) {
+	heap := tHeap{
+		cap: 512,
+	}
+
+	if heap.heap != nil {
+		t.Fatal("heap not nil")
+	}
+}
