@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	node.Handler("Hello, World!", func(query []byte, connection *node.Connection) {
+	node.Handler("Hello, World!", func(connection *node.Connection) {
 		b, err := connection.Receive()
 		if err != nil {
 			log.Print(err)

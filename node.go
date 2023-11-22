@@ -9,14 +9,14 @@ import (
 
 type handler struct {
 	nodeID [32]byte
-	f      func(query []byte, connection *Connection)
+	f      func(connection *Connection)
 }
 
 var (
 	handlers []*handler
 )
 
-func Handler(nodeID string, f func(query []byte, connection *Connection)) {
+func Handler(nodeID string, f func(connection *Connection)) {
 	h := &handler{
 		f: f,
 	}
