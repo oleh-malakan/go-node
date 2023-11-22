@@ -35,10 +35,10 @@ func init() {
 func TestHeapCap0(t *testing.T) {
 	heap := tHeap{}
 
-	heap.Put(arr[0])
-	heap.Put(arr[1])
-	
-	_, last := heap.Find(arr[0].nextMac[0:32])
+	heap.put(arr[0])
+	heap.put(arr[1])
+
+	_, last := heap.find(arr[0].nextMac[0:32])
 	if last == nil {
 		t.Fatal("next not fount")
 	}
@@ -53,10 +53,10 @@ func TestHeapCap1(t *testing.T) {
 		cap: 1,
 	}
 
-	heap.Put(arr[0])
-	heap.Put(arr[1])
-	
-	_, last := heap.Find(arr[0].nextMac[0:32])
+	heap.put(arr[0])
+	heap.put(arr[1])
+
+	_, last := heap.find(arr[0].nextMac[0:32])
 	if last == nil {
 		t.Fatal("next not fount")
 	}
@@ -66,20 +66,19 @@ func TestHeapCap1(t *testing.T) {
 	}
 }
 
-
 func TestHeapCap5(t *testing.T) {
 	heap := tHeap{
 		cap: 5,
 	}
 
-	heap.Put(arr[0])
-	heap.Put(arr[3])
-	heap.Put(arr[2])
-	heap.Put(arr[1])
-	heap.Put(arr[4])
-	heap.Put(arr[5])
-	
-	_, last := heap.Find(arr[0].nextMac[0:32])
+	heap.put(arr[0])
+	heap.put(arr[3])
+	heap.put(arr[2])
+	heap.put(arr[1])
+	heap.put(arr[4])
+	heap.put(arr[5])
+
+	_, last := heap.find(arr[0].nextMac[0:32])
 	if last == nil {
 		t.Fatal("next not fount")
 	}
