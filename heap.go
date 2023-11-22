@@ -1,30 +1,23 @@
 package node
 
-import "time"
-
 type heapItem struct {
 	readData  *readData
 	indexNext *heapItem
 	indexPrev *heapItem
-	time      int64
-	timeout   int64
 	next      *heapItem
 	prev      *heapItem
 }
 
 type heap struct {
-	heap    *heapItem
-	last    *heapItem
-	len     int
-	cap     int // required > 0
-	timeout int64
+	heap *heapItem
+	last *heapItem
+	len  int
+	cap  int // required > 0
 }
 
 func (h *heap) put(r *readData) {
 	item := &heapItem{
 		readData: r,
-		time:     time.Now().UnixNano(),
-		timeout:  h.timeout,
 	}
 
 LOOP:
@@ -52,7 +45,6 @@ LOOP:
 		heap := h.heap
 		for heap != nil && (item.indexPrev == nil || item.indexNext == nil) {
 			if compareID(r.b[33:65], heap.readData.b[33:65]) {
-				heap.time = time.Now().UnixNano()
 				return
 			}
 			if item.indexNext == nil && compareID(r.nextMac[0:32], heap.readData.b[33:65]) {
@@ -61,7 +53,6 @@ LOOP:
 			if item.indexPrev == nil && compareID(heap.readData.nextMac[0:32], r.b[33:65]) {
 				item.indexPrev = heap
 				if item.indexPrev.indexNext != nil {
-					item.indexPrev.indexNext.time = time.Now().UnixNano()
 					return
 				}
 			}

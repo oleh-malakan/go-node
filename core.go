@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"net"
-	"time"
 )
 
 type client struct {
@@ -51,8 +50,7 @@ func (c *core) bypass(r *readData) {
 			conn: tls.Server(&dataport{}, c.tlsConfig),
 			lock: make(chan *struct{}, 1),
 			heap: &heap{
-				cap:     512,
-				timeout: int64(time.Duration(50) * time.Millisecond),
+				cap: 512,
 			},
 		}
 		client.readData = r
