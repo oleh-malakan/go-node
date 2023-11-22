@@ -21,49 +21,54 @@ type tHeap struct {
 }
 
 func (t *tHeap) put(r *tReadData) {
-	if t.cap <= t.len {
-		t.len--
-		if t.last.prev != nil {
-			t.last = t.last.prev
-			t.last.next = nil
-		} else {
-			t.last = nil
-		}
+	heapItem := &tHeapItem{
+		readData: r,
+		time:     time.Now().UnixNano(),
+		timeout:  t.timeout,
 	}
-	
-	var (
-		indexPrev *tHeapItem
-		indexNext *tHeapItem
-	)
-	heap := t.heap
-	for heap != nil && (indexPrev == nil || indexNext == nil) {
-		if compareID(r.b[33:65], heap.readData.b[33:65]) {
-			heap.time = time.Now().UnixNano()
-			return
-		}
-		if indexNext == nil && compareID(r.nextMac[0:32], heap.readData.b[33:65]) {
-			indexNext = heap
-		}
-		if indexPrev == nil && compareID(heap.readData.nextMac[0:32], r.b[33:65]) {
-			indexPrev = heap
-			if indexPrev.indexNext != nil {
-				indexPrev.indexNext.time = time.Now().UnixNano()
-				return
+
+LOOP:
+	if t.last != nil {
+		if t.cap <= t.len {
+			t.len--
+
+			if t.last.indexNext != nil {
+				t.last.indexNext.indexPrev = nil
+			}
+			if t.last.indexPrev != nil {
+				t.last.indexPrev.indexNext = nil
+			}
+
+			if t.last.prev != nil {
+				t.last = t.last.prev
+				t.last.next = nil
+			} else {
+				t.last = nil
+				t.heap = nil
+				goto LOOP
 			}
 		}
 
-		heap = heap.next
-	}
+		heap := t.heap
+		for heap != nil && (heapItem.indexPrev == nil || heapItem.indexNext == nil) {
+			if compareID(r.b[33:65], heap.readData.b[33:65]) {
+				heap.time = time.Now().UnixNano()
+				return
+			}
+			if heapItem.indexNext == nil && compareID(r.nextMac[0:32], heap.readData.b[33:65]) {
+				heapItem.indexNext = heap
+			}
+			if heapItem.indexPrev == nil && compareID(heap.readData.nextMac[0:32], r.b[33:65]) {
+				heapItem.indexPrev = heap
+				if heapItem.indexPrev.indexNext != nil {
+					heapItem.indexPrev.indexNext.time = time.Now().UnixNano()
+					return
+				}
+			}
 
-	heapItem := &tHeapItem{
-		readData:  r,
-		indexNext: indexNext,
-		indexPrev: indexPrev,
-		time:      time.Now().UnixNano(),
-		timeout:   t.timeout,
-	}
+			heap = heap.next
+		}
 
-	if t.last != nil {
 		if heap != nil {
 			if heap.next != nil {
 				heap.next.prev = heapItem
@@ -80,8 +85,8 @@ func (t *tHeap) put(r *tReadData) {
 			t.last = heapItem
 		}
 
-		if indexPrev != nil {
-			indexPrev.indexNext = heapItem
+		if heapItem.indexPrev != nil {
+			heapItem.indexPrev.indexNext = heapItem
 		}
 	} else {
 		t.heap = heapItem
