@@ -1,38 +1,11 @@
 package node
 
 import (
-	"crypto/sha256"
 	"encoding/binary"
 	"testing"
 )
 
-const (
-	capHeap = 512
-)
-
-var (
-	arr []*tReadData
-)
-
-func init() {
-	var (
-		nextMac [32]byte
-	)
-	for i := 0; i < capHeap; i++ {
-		readData := &tReadData{
-			b: make([]byte, 1432),
-		}
-		data := make([]byte, 8)
-		binary.BigEndian.PutUint64(data, uint64(i))
-		copy(readData.b[65:73], data)
-		copy(readData.b[33:65], nextMac[0:32])
-		nextMac = sha256.Sum256(readData.b[65:])
-		readData.nextMac = nextMac
-		arr = append(arr, readData)
-	}
-}
-
-func heapCheckResult(next *tReadData, offset int, len int) bool {
+func heapCheckResult(next *readData, offset int, len int) bool {
 	for i := offset; i < offset+len; i++ {
 		if next != nil {
 			v := binary.BigEndian.Uint64(next.b[65:73])
@@ -49,7 +22,7 @@ func heapCheckResult(next *tReadData, offset int, len int) bool {
 }
 
 func TestHeapCap0(t *testing.T) {
-	heap := tHeap{}
+	heap := heap{}
 
 	heap.put(arr[0])
 	heap.put(arr[1])
@@ -69,7 +42,7 @@ func TestHeapCap0(t *testing.T) {
 }
 
 func TestHeapCap1(t *testing.T) {
-	heap := tHeap{
+	heap := heap{
 		cap: 1,
 	}
 
@@ -91,7 +64,7 @@ func TestHeapCap1(t *testing.T) {
 }
 
 func TestHeapCap5(t *testing.T) {
-	heap := tHeap{
+	heap := heap{
 		cap: 5,
 	}
 
@@ -128,7 +101,7 @@ func TestHeapCap5(t *testing.T) {
 }
 
 func TestHeap1(t *testing.T) {
-	heap := tHeap{
+	heap := heap{
 		cap: 512,
 	}
 
@@ -138,7 +111,7 @@ func TestHeap1(t *testing.T) {
 }
 
 func TestHeap2(t *testing.T) {
-	heap := tHeap{
+	heap := heap{
 		cap: 512,
 	}
 

@@ -2,66 +2,66 @@ package node
 
 import "time"
 
-type tHeapItem struct {
-	readData  *tReadData
-	indexNext *tHeapItem
-	indexPrev *tHeapItem
+type heapItem struct {
+	readData  *readData
+	indexNext *heapItem
+	indexPrev *heapItem
 	time      int64
 	timeout   int64
-	next      *tHeapItem
-	prev      *tHeapItem
+	next      *heapItem
+	prev      *heapItem
 }
 
-type tHeap struct {
-	heap    *tHeapItem
-	last    *tHeapItem
+type heap struct {
+	heap    *heapItem
+	last    *heapItem
 	len     int
 	cap     int // required > 0
 	timeout int64
 }
 
-func (t *tHeap) put(r *tReadData) {
-	heapItem := &tHeapItem{
+func (h *heap) put(r *readData) {
+	item := &heapItem{
 		readData: r,
 		time:     time.Now().UnixNano(),
-		timeout:  t.timeout,
+		timeout:  h.timeout,
 	}
 
 LOOP:
-	if t.last != nil {
-		if t.cap <= t.len {
-			t.len--
+	if h.last != nil {
+		if h.cap <= h.len {
+			h.len--
 
-			if t.last.indexNext != nil {
-				t.last.indexNext.indexPrev = nil
+			if h.last.indexNext != nil {
+				h.last.indexNext.indexPrev = nil
 			}
-			if t.last.indexPrev != nil {
-				t.last.indexPrev.indexNext = nil
+			if h.last.indexPrev != nil {
+				h.last.indexPrev.indexNext = nil
 			}
 
-			if t.last.prev != nil {
-				t.last = t.last.prev
-				t.last.next = nil
+			if h.last.prev != nil {
+				h.last = h.last.prev
+				h.last.next = nil
 			} else {
-				t.last = nil
-				t.heap = nil
+				h.last = nil
+				h.heap = nil
 				goto LOOP
 			}
 		}
 
-		heap := t.heap
-		for heap != nil && (heapItem.indexPrev == nil || heapItem.indexNext == nil) {
+		heap := h.heap
+		for heap != nil && (item.indexPrev == nil || item.indexNext == nil) {
 			if compareID(r.b[33:65], heap.readData.b[33:65]) {
 				heap.time = time.Now().UnixNano()
 				return
 			}
-			if heapItem.indexNext == nil && compareID(r.nextMac[0:32], heap.readData.b[33:65]) {
-				heapItem.indexNext = heap
+			if item.indexNext == nil && compareID(r.nextMac[0:32], heap.readData.b[33:65]) {
+				item.indexNext = heap
 			}
-			if heapItem.indexPrev == nil && compareID(heap.readData.nextMac[0:32], r.b[33:65]) {
-				heapItem.indexPrev = heap
-				if heapItem.indexPrev.indexNext != nil {
-					heapItem.indexPrev.indexNext.time = time.Now().UnixNano()
+			if item.indexPrev == nil && compareID(heap.readData.nextMac[0:32], r.b[33:65]) {
+				item.indexPrev = heap
+				if item.indexPrev.indexNext != nil {
+					item.indexPrev.indexNext.time = time.Now().UnixNano()
 					return
 				}
 			}
@@ -71,54 +71,54 @@ LOOP:
 
 		if heap != nil {
 			if heap.next != nil {
-				heap.next.prev = heapItem
-				heapItem.next = heap.next
+				heap.next.prev = item
+				item.next = heap.next
 			}
-			heap.next = heapItem
-			heapItem.prev = heap
+			heap.next = item
+			item.prev = heap
 			if heap.next == nil {
-				t.last = heap
+				h.last = heap
 			}
 		} else {
-			heapItem.prev = t.last
-			t.last.next = heapItem
-			t.last = heapItem
+			item.prev = h.last
+			h.last.next = item
+			h.last = item
 		}
 
-		if heapItem.indexPrev != nil {
-			heapItem.indexPrev.indexNext = heapItem
+		if item.indexPrev != nil {
+			item.indexPrev.indexNext = item
 		}
 	} else {
-		t.heap = heapItem
-		t.last = heapItem
+		h.heap = item
+		h.last = item
 	}
 
-	t.len++
+	h.len++
 }
 
-func (t *tHeap) find(nextMac []byte) (next, last *tReadData) {
-	delete := func(heapItem *tHeapItem) {
-		if heapItem != nil {
-			if heapItem.prev != nil {
-				heapItem.prev.next = heapItem.next
-				if heapItem.next != nil {
-					heapItem.next.prev = heapItem.prev
+func (h *heap) find(nextMac []byte) (next, last *readData) {
+	delete := func(item *heapItem) {
+		if item != nil {
+			if item.prev != nil {
+				item.prev.next = item.next
+				if item.next != nil {
+					item.next.prev = item.prev
 				} else {
-					t.last = heapItem.prev
+					h.last = item.prev
 				}
 			} else {
-				t.heap = heapItem.next
-				if t.heap != nil {
-					t.heap.prev = nil
+				h.heap = item.next
+				if h.heap != nil {
+					h.heap.prev = nil
 				} else {
-					t.last = nil
+					h.last = nil
 				}
 			}
-			t.len--
+			h.len--
 		}
 	}
 
-	heap := t.heap
+	heap := h.heap
 	for heap != nil {
 		if compareID(nextMac, heap.readData.b[33:65]) {
 			next = heap.readData
