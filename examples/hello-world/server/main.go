@@ -9,7 +9,12 @@ import (
 )
 
 func main() {
-	node.Handler("Hello, World!", func(connection *node.Connection) {
+	server, err := node.Run(&tls.Config{}, &net.UDPAddr{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	server.Handler("Hello, World!", func(connection *node.Connection) {
 		b, err := connection.Receive()
 		if err != nil {
 			log.Print(err)
@@ -27,5 +32,5 @@ func main() {
 		}
 	})
 
-	log.Fatal(node.Do(&tls.Config{}, &net.UDPAddr{}))
+	server.Wait()
 }
