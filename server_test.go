@@ -10,4 +10,3 @@ func init() {
 		checkLock:  make(chan *struct{}, 1),
 	}
 }
-

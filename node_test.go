@@ -10,7 +10,7 @@ const (
 )
 
 var (
-	arr  []*readData
+	arr []*readData
 )
 
 func init() {

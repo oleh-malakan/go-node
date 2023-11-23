@@ -17,7 +17,7 @@ func main() {
 
 	connection, err := client.Connect("Hello, World!")
 	if err != nil {
-		log.Print(err)
+		log.Fatal(err)
 
 		return
 	}

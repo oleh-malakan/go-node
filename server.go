@@ -12,16 +12,23 @@ func New(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPA
 		return nil, errors.New("require tls config")
 	}
 
-	server := &Server{
-		tlsConfig:  tlsConfig,
-		memoryLock: make(chan *struct{}, 1),
-		checkLock:  make(chan *struct{}, 1),
-	}
-	if err := server.do(tlsConfig, address, nodeAddresses...); err != nil {
-		return nil, err
-	}
+	return &Server{
+		tlsConfig:     tlsConfig,
+		address:       address,
+		nodeAddresses: nodeAddresses,
+		memoryLock:    make(chan *struct{}, 1),
+		checkLock:     make(chan *struct{}, 1),
+	}, nil
+}
 
-	return server, nil
+type Server struct {
+	handlers      []*Handler
+	memory        *client
+	memoryLock    chan *struct{}
+	checkLock     chan *struct{}
+	tlsConfig     *tls.Config
+	address       *net.UDPAddr
+	nodeAddresses []*net.UDPAddr
 }
 
 type client struct {
@@ -36,56 +43,32 @@ type client struct {
 	drop         bool
 }
 
-type Server struct {
-	handlers   []*Handler
-	memory     *client
-	memoryLock chan *struct{}
-	checkLock  chan *struct{}
-	tlsConfig  *tls.Config
-}
-
-func (n *Server) Handler(nodeID string, f func(connection *Connection)) (*Handler, error) {
+func (s *Server) Handler(nodeID string, f func(connection *Connection)) (*Handler, error) {
 	h := &Handler{
 		f: f,
 	}
 	h.nodeID = sha256.Sum256([]byte(nodeID))
 
-	n.handlers = append(n.handlers, h)
+	s.handlers = append(s.handlers, h)
 
 	return h, nil
 }
 
-func (n *Server) Listen(nodeID string) (*Listener, error) {
+func (s *Server) Listen(nodeID string) (*Listener, error) {
 	return &Listener{}, nil
 }
 
-func (n *Server) do(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) error {
-	conn, err := net.ListenUDP("udp", address)
-	if err != nil {
-		return err
-	}
-
-	for {
-		r := &readData{
-			b: make([]byte, 1432),
-		}
-		r.n, r.rAddr, r.err = conn.ReadFromUDP(r.b)
-
-		go n.process(r)
-	}
-}
-
-func (n *Server) process(r *readData) {
+func (s *Server) process(r *readData) {
 	switch {
 	case r.b[0]>>7&1 == 0:
 		r.nextMac = sha256.Sum256(r.b[1:r.n])
-		n.checkLock <- nil
+		s.checkLock <- nil
 		var current *client
-		if !n.bypass(func(c *client) bool {
+		if !s.bypass(func(c *client) bool {
 			return compareID(c.initalMac[0:32], r.nextMac[0:32])
 		}) {
 			current = &client{
-				conn: tls.Server(&dataport{}, n.tlsConfig),
+				conn: tls.Server(&dataport{}, s.tlsConfig),
 				lock: make(chan *struct{}, 1),
 				heap: &heap{
 					cap: 512,
@@ -96,20 +79,20 @@ func (n *Server) process(r *readData) {
 			current.initalMac = r.nextMac
 			current.drop = false
 		}
-		n.memoryLock <- nil
+		s.memoryLock <- nil
 		if current != nil {
-			if n.memory != nil {
-				current.next = n.memory
-				n.memory = current
+			if s.memory != nil {
+				current.next = s.memory
+				s.memory = current
 			} else {
-				n.memory = current
+				s.memory = current
 			}
 		}
-		<-n.memoryLock
-		<-n.checkLock
-	case r.b[0]>>7&1 == 1 && n.memory != nil:
+		<-s.memoryLock
+		<-s.checkLock
+	case r.b[0]>>7&1 == 1 && s.memory != nil:
 		r.nextMac = sha256.Sum256(r.b[65:r.n])
-		n.bypass(func(c *client) (f bool) {
+		s.bypass(func(c *client) (f bool) {
 			w := c.writeData
 			for w != nil {
 				if compareID(w.mac[0:32], r.b[1:33]) {
@@ -135,14 +118,14 @@ func (n *Server) process(r *readData) {
 	}
 }
 
-func (n *Server) bypass(f func(c *client) bool) (ok bool) {
+func (s *Server) bypass(f func(c *client) bool) (ok bool) {
 	var current *client
-	n.memoryLock <- nil
-	if n.memory != nil {
-		current = n.memory
+	s.memoryLock <- nil
+	if s.memory != nil {
+		current = s.memory
 		current.lock <- nil
 	}
-	<-n.memoryLock
+	<-s.memoryLock
 	for current != nil {
 		var next *client
 		if !current.drop {
@@ -163,6 +146,22 @@ func (n *Server) bypass(f func(c *client) bool) (ok bool) {
 	return
 }
 
-func (n *Server) Run() {
+func (s *Server) Run() error {
+	conn, err := net.ListenUDP("udp", s.address)
+	if err != nil {
+		return err
+	}
 
+	for {
+		r := &readData{
+			b: make([]byte, 1432),
+		}
+		r.n, r.rAddr, r.err = conn.ReadFromUDP(r.b)
+
+		go s.process(r)
+	}
+}
+
+func (s *Server) Close() error {
+	return nil
 }

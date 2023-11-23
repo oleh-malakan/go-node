@@ -6,8 +6,8 @@ import (
 )
 
 type dataport struct {
-	cRead  chan []byte
-	cWrite chan []byte
+	read  chan []byte
+	write chan []byte
 }
 
 func (d *dataport) Read(b []byte) (n int, err error) {

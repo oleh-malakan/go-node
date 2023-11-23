@@ -14,7 +14,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	server.Handler("Hello, World!", func(connection *node.Connection) {
+	_, err = server.Handler("Hello, World!", func(connection *node.Connection) {
 		b, err := connection.Receive()
 		if err != nil {
 			log.Print(err)
@@ -31,6 +31,9 @@ func main() {
 			}
 		}
 	})
+	if err != nil {
+		log.Println(err)
+	}
 
-	server.Run()
+	log.Fatal(server.Run())
 }

@@ -1,6 +1,6 @@
 package node
 
-type Listener struct {}
+type Listener struct{}
 
 func (l *Listener) Accept() (*Connection, error) {
 	return &Connection{}, nil

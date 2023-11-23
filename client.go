@@ -15,7 +15,7 @@ func Dial(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Client, error)
 		cRead:  make(chan []byte),
 		cWrite: make(chan []byte),
 	}
-	client.conn = tls.Client(&dataport{cRead: client.cRead, cWrite: client.cWrite}, tlsConfig)
+	client.conn = tls.Client(&dataport{read: client.cRead, write: client.cWrite}, tlsConfig)
 	err := client.dial(nodeAddresses...)
 	if err != nil {
 		return nil, err
