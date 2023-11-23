@@ -24,8 +24,9 @@ type client struct {
 	conn         *tls.Conn
 	lastReadData *readData
 	readData     *readData
-	heap         *heap
 	writeData    *writeData
+	initalMac    [32]byte
+	heap         *heap
 	next         *client
 	lock         chan *struct{}
 	drop         bool
@@ -76,25 +77,42 @@ func (n *Server) bypass(r *readData) {
 	switch {
 	case r.b[0]>>7&1 == 0:
 		r.nextMac = sha256.Sum256(r.b[1:r.n])
-		client := &client{
+		current := &client{
 			conn: tls.Server(&dataport{}, n.tlsConfig),
 			lock: make(chan *struct{}, 1),
 			heap: &heap{
 				cap: 512,
 			},
 		}
-		client.readData = r
-		client.lastReadData = r
-		client.drop = false
+		current.readData = r
+		current.lastReadData = r
+		current.initalMac = r.nextMac
+		current.drop = false
 
 		n.memoryLock <- nil
 		if n.memory != nil {
-			client.next = n.memory
-			n.memory = client
+			current.next = n.memory
+			n.memory = current
 		} else {
-			n.memory = client
+			n.memory = current
 		}
+		current.lock <- nil
 		<-n.memoryLock
+		for current != nil {
+			var next *client
+
+			if !current.drop {
+				
+			}
+
+			next = current.next
+			if next != nil {
+				next.lock <- nil
+			}
+			<-current.lock
+			current = next
+
+		}
 	case r.b[0]>>7&1 == 1 && n.memory != nil:
 		r.nextMac = sha256.Sum256(r.b[65:r.n])
 		var current *client
