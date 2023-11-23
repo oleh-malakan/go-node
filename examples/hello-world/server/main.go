@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	server, err := node.Run(&tls.Config{}, &net.UDPAddr{})
+	server, err := node.New(&tls.Config{}, &net.UDPAddr{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -32,5 +32,5 @@ func main() {
 		}
 	})
 
-	server.Wait()
+	server.Run()
 }

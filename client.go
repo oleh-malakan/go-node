@@ -6,16 +6,6 @@ import (
 	"net"
 )
 
-type Client struct {
-	conn   *tls.Conn
-	cRead  chan []byte
-	cWrite chan []byte
-}
-
-func (c *Client) Connect(nodeID string) (*Connection, error) {
-	return &Connection{}, nil
-}
-
 func Dial(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Client, error) {
 	if len(nodeAddresses) == 0 {
 		return nil, errors.New("node address not specified")
@@ -32,6 +22,16 @@ func Dial(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Client, error)
 	}
 
 	return client, nil
+}
+
+type Client struct {
+	conn   *tls.Conn
+	cRead  chan []byte
+	cWrite chan []byte
+}
+
+func (c *Client) Connect(nodeID string) (*Connection, error) {
+	return &Connection{}, nil
 }
 
 func (c *Client) dial(nodeAddresses ...*net.UDPAddr) error {
