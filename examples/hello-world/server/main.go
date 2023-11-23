@@ -33,6 +33,8 @@ func main() {
 	})
 	if err != nil {
 		log.Println(err)
+
+		return
 	}
 
 	log.Fatal(server.Run())

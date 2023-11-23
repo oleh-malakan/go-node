@@ -18,11 +18,10 @@ func main() {
 	connection, err := client.Connect("Hello, World!")
 	if err != nil {
 		log.Fatal(err)
-
-		return
 	}
 
-	if err := connection.Send([]byte("Hello")); err != nil {
+	err = connection.Send([]byte("Hello"))
+	if err != nil {
 		log.Print(err)
 
 		return
@@ -36,7 +35,8 @@ func main() {
 	}
 	fmt.Println(string(b))
 
-	if err := connection.Close(); err != nil {
+	err = connection.Close()
+	if err != nil {
 		log.Print(err)
 
 		return
