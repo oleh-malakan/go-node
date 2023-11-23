@@ -32,7 +32,7 @@ func main() {
 		}
 	})
 	if err != nil {
-		log.Println(err)
+		log.Print(err)
 
 		return
 	}
