@@ -5,8 +5,5 @@ var (
 )
 
 func init() {
-	server = &Server{
-		memoryLock: make(chan *struct{}, 1),
-		checkLock:  make(chan *struct{}, 1),
-	}
+	server = &Server{}
 }

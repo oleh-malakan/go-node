@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"net"
+	"sync"
 )
 
 func New(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
@@ -16,16 +17,14 @@ func New(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPA
 		tlsConfig:     tlsConfig,
 		address:       address,
 		nodeAddresses: nodeAddresses,
-		memoryLock:    make(chan *struct{}, 1),
-		checkLock:     make(chan *struct{}, 1),
 	}, nil
 }
 
 type Server struct {
 	handlers      []*Handler
 	memory        *client
-	memoryLock    chan *struct{}
-	checkLock     chan *struct{}
+	memoryLock    sync.Mutex
+	checkLock     sync.Mutex
 	tlsConfig     *tls.Config
 	address       *net.UDPAddr
 	nodeAddresses []*net.UDPAddr
@@ -39,7 +38,7 @@ type client struct {
 	initalMac    [32]byte
 	heap         *heap
 	next         *client
-	lock         chan *struct{}
+	lock         sync.Mutex
 	drop         bool
 }
 
@@ -62,14 +61,13 @@ func (s *Server) process(r *readData) {
 	switch {
 	case r.b[0]>>7&1 == 0:
 		r.nextMac = sha256.Sum256(r.b[1:r.n])
-		s.checkLock <- nil
+		s.checkLock.Lock()
 		var current *client
 		if !s.bypass(func(c *client) bool {
 			return compareID(c.initalMac[0:32], r.nextMac[0:32])
 		}) {
 			current = &client{
 				conn: tls.Server(&dataport{}, s.tlsConfig),
-				lock: make(chan *struct{}, 1),
 				heap: &heap{
 					cap: 512,
 				},
@@ -79,7 +77,7 @@ func (s *Server) process(r *readData) {
 			current.initalMac = r.nextMac
 			current.drop = false
 		}
-		s.memoryLock <- nil
+		s.memoryLock.Lock()
 		if current != nil {
 			if s.memory != nil {
 				current.next = s.memory
@@ -88,8 +86,8 @@ func (s *Server) process(r *readData) {
 				s.memory = current
 			}
 		}
-		<-s.memoryLock
-		<-s.checkLock
+		s.memoryLock.Unlock()
+		s.checkLock.Unlock()
 	case r.b[0]>>7&1 == 1 && s.memory != nil:
 		r.nextMac = sha256.Sum256(r.b[65:r.n])
 		s.bypass(func(c *client) (f bool) {
@@ -120,12 +118,12 @@ func (s *Server) process(r *readData) {
 
 func (s *Server) bypass(f func(c *client) bool) (ok bool) {
 	var current *client
-	s.memoryLock <- nil
+	s.memoryLock.Lock()
 	if s.memory != nil {
 		current = s.memory
-		current.lock <- nil
+		current.lock.Lock()
 	}
-	<-s.memoryLock
+	s.memoryLock.Unlock()
 	for current != nil {
 		var next *client
 		if !current.drop {
@@ -136,10 +134,10 @@ func (s *Server) bypass(f func(c *client) bool) (ok bool) {
 		}
 		next = current.next
 		if next != nil {
-			next.lock <- nil
+			next.lock.Lock()
 		}
 	UNLOCK:
-		<-current.lock
+		current.lock.Unlock()
 		current = next
 	}
 
