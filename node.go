@@ -74,6 +74,10 @@ func (n *node) process() {
 	for {
 		select {
 		case <-n.reset:
+		case p := <-n.in:
+			if n.next != nil {
+				n.next.in <- p
+			}
 		case n.drop <- n:
 			return
 		}
