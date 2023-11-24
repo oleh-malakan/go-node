@@ -26,13 +26,13 @@ func (n *node) process() {
 			case p.b[0]>>7&1 == 0:
 				if compareID(n.initalMac[0:32], p.nextMac[0:32]) {
 					continue
-				} else if n.next == nil {
+				} else if n.next != nil {
+					n.next.in <- p
+				} else {
 					n.next = newNode(p, n.nextDrop, n.tlsConfig)
 					go n.next.process()
 
 					continue
-				} else {
-					n.next.in <- p
 				}
 			case p.b[0]>>7&1 == 1:
 				w := n.outgoing
