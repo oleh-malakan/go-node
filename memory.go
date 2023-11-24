@@ -9,7 +9,7 @@ type memory struct {
 	tlsConfig *tls.Config
 	next      *node
 	in        chan *incomingPackage
-	drop      chan *struct{}
+	nextDrop  chan *node
 }
 
 func (m *memory) process() {
@@ -22,16 +22,7 @@ func (m *memory) process() {
 				if m.next != nil {
 					m.next.in <- p
 				} else {
-					m.next = &node{
-						conn: tls.Server(&dataport{}, m.tlsConfig),
-						heap: &heap{
-							cap: 512,
-						},
-						in: make(chan *incomingPackage),
-					}
-					m.next.incoming = p
-					m.next.lastIncoming = p
-					m.next.initalMac = p.nextMac
+					m.next = newNode(p, m.nextDrop, m.tlsConfig)
 					go m.next.process()
 				}
 			case p.b[0]>>7&1 == 1:
@@ -40,7 +31,8 @@ func (m *memory) process() {
 					m.next.in <- p
 				}
 			}
-		case <-m.drop:
+		case <-m.nextDrop:
+			dropNextNode()
 		}
 	}
 }

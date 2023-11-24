@@ -12,7 +12,8 @@ type node struct {
 	heap         *heap
 	next         *node
 	in           chan *incomingPackage
-	drop         chan *struct{}
+	nextDrop     chan *node
+	drop         chan *node
 	isDrop       bool
 }
 
@@ -26,16 +27,7 @@ func (n *node) process() {
 					if compareID(n.initalMac[0:32], p.nextMac[0:32]) {
 						continue
 					} else if n.next == nil {
-						n.next = &node{
-							conn: tls.Server(&dataport{}, n.tlsConfig),
-							heap: &heap{
-								cap: 512,
-							},
-							in: make(chan *incomingPackage),
-						}
-						n.next.incoming = p
-						n.next.lastIncoming = p
-						n.next.initalMac = p.nextMac
+						n.next = newNode(p, n.nextDrop, n.tlsConfig)
 						go n.next.process()
 
 						continue
@@ -68,7 +60,29 @@ func (n *node) process() {
 					}
 				}
 			}
-		case <-n.drop:
+		case <-n.nextDrop:
+			dropNextNode()
 		}
 	}
+}
+
+func newNode(incoming *incomingPackage, nextDrop chan *node, tlsConfig *tls.Config) *node {
+	new := &node{
+		conn: tls.Server(&dataport{}, tlsConfig),
+		heap: &heap{
+			cap: 512,
+		},
+		in:       make(chan *incomingPackage),
+		nextDrop: make(chan *node),
+	}
+	new.incoming = incoming
+	new.lastIncoming = incoming
+	new.initalMac = incoming.nextMac
+	new.drop = nextDrop
+
+	return new
+}
+
+func dropNextNode() {
+
 }
