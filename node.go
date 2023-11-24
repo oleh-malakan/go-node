@@ -60,8 +60,11 @@ func (n *node) process() {
 					}
 				}
 			}
-		case <-n.nextDrop:
-			dropNextNode()
+		case next := <-n.nextDrop:
+			n.next = next
+			if n.next != nil {
+				
+			}
 		}
 	}
 }
@@ -83,6 +86,6 @@ func newNode(incoming *incomingPackage, nextDrop chan *node, tlsConfig *tls.Conf
 	return new
 }
 
-func dropNextNode() {
+func dropNextNode(node) {
 
 }
