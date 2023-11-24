@@ -12,26 +12,23 @@ func New(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPA
 		return nil, errors.New("require tls config")
 	}
 
-	server := &Server{
+	return &Server{
 		tlsConfig:     tlsConfig,
 		address:       address,
 		nodeAddresses: nodeAddresses,
-		memory: &memory{
-			tlsConfig: tlsConfig,
-			in:        make(chan *incomingPackage, 512),
-			nextDrop:  make(chan *container),
-		},
-	}
-	go server.memory.process()
-
-	return server, nil
+		in:            make(chan *incomingPackage, 512),
+		nextDrop:      make(chan *container),
+	}, nil
 }
 
 type Server struct {
 	tlsConfig     *tls.Config
-	memory        *memory
 	address       *net.UDPAddr
 	nodeAddresses []*net.UDPAddr
+
+	next     *container
+	in       chan *incomingPackage
+	nextDrop chan *container
 }
 
 func (s *Server) Handler(nodeID string, f func(connection *Connection)) (*Handler, error) {
@@ -53,13 +50,47 @@ func (s *Server) Run() error {
 		return err
 	}
 
+	go s.process()
+
 	for {
 		incoming := &incomingPackage{
 			b: make([]byte, 1432),
 		}
 		incoming.n, incoming.rAddr, incoming.err = conn.ReadFromUDP(incoming.b)
 
-		s.memory.in <- incoming
+		s.in <- incoming
+	}
+}
+
+func (s *Server) process() {
+	for {
+		select {
+		case p := <-s.in:
+			switch {
+			case p.b[0]>>7&1 == 0:
+				p.nextMac = sha256.Sum256(p.b[1:p.n])
+				if s.next != nil {
+					s.next.in <- p
+				} else {
+					s.next = newContainer(p, s.nextDrop, s.tlsConfig)
+					go s.next.process()
+				}
+			case p.b[0]>>7&1 == 1:
+				p.nextMac = sha256.Sum256(p.b[65:p.n])
+				if s.next != nil {
+					s.next.in <- p
+				}
+			}
+		case dropNode := <-s.nextDrop:
+			s.next = dropNode.next
+			if s.next != nil {
+				s.next.drop = s.nextDrop
+				select {
+				case s.next.reset <- nil:
+				default:
+				}
+			}
+		}
 	}
 }
 
