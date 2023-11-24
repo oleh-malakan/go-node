@@ -10,7 +10,7 @@ const (
 )
 
 var (
-	arr []*readData
+	arr []*incomingPackage
 )
 
 func init() {
@@ -18,7 +18,7 @@ func init() {
 		nextMac [32]byte
 	)
 	for i := 0; i < capHeap; i++ {
-		readData := &readData{
+		readData := &incomingPackage{
 			b: make([]byte, 1432),
 		}
 		data := make([]byte, 8)

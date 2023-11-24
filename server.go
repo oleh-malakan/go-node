@@ -32,9 +32,9 @@ type Server struct {
 
 type client struct {
 	conn         *tls.Conn
-	lastReadData *readData
-	readData     *readData
-	writeData    *writeData
+	lastReadData *incomingPackage
+	readData     *incomingPackage
+	writeData    *outgoingPackage
 	initalMac    [32]byte
 	heap         *heap
 	next         *client
@@ -57,14 +57,14 @@ func (s *Server) Listen(nodeID string) (*Listener, error) {
 	return &Listener{}, nil
 }
 
-func (s *Server) process(r *readData) {
+func (s *Server) process(p *incomingPackage) {
 	switch {
-	case r.b[0]>>7&1 == 0:
-		r.nextMac = sha256.Sum256(r.b[1:r.n])
+	case p.b[0]>>7&1 == 0:
+		p.nextMac = sha256.Sum256(p.b[1:p.n])
 		s.checkLock.Lock()
 		var current *client
 		if !s.bypass(func(c *client) bool {
-			return compareID(c.initalMac[0:32], r.nextMac[0:32])
+			return compareID(c.initalMac[0:32], p.nextMac[0:32])
 		}) {
 			current = &client{
 				conn: tls.Server(&dataport{}, s.tlsConfig),
@@ -72,9 +72,9 @@ func (s *Server) process(r *readData) {
 					cap: 512,
 				},
 			}
-			current.readData = r
-			current.lastReadData = r
-			current.initalMac = r.nextMac
+			current.readData = p
+			current.lastReadData = p
+			current.initalMac = p.nextMac
 			current.drop = false
 		}
 		s.memoryLock.Lock()
@@ -88,22 +88,22 @@ func (s *Server) process(r *readData) {
 		}
 		s.memoryLock.Unlock()
 		s.checkLock.Unlock()
-	case r.b[0]>>7&1 == 1 && s.memory != nil:
-		r.nextMac = sha256.Sum256(r.b[65:r.n])
+	case p.b[0]>>7&1 == 1 && s.memory != nil:
+		p.nextMac = sha256.Sum256(p.b[65:p.n])
 		s.bypass(func(c *client) (f bool) {
 			w := c.writeData
 			for w != nil {
-				if compareID(w.mac[0:32], r.b[1:33]) {
-					if compareID(c.lastReadData.nextMac[0:32], r.b[33:65]) {
-						c.lastReadData.next = r
-						c.lastReadData = r
-						var last *readData
-						c.lastReadData.next, last = c.heap.find(r.nextMac[0:32])
+				if compareID(w.mac[0:32], p.b[1:33]) {
+					if compareID(c.lastReadData.nextMac[0:32], p.b[33:65]) {
+						c.lastReadData.next = p
+						c.lastReadData = p
+						var last *incomingPackage
+						c.lastReadData.next, last = c.heap.find(p.nextMac[0:32])
 						if last != nil {
 							c.lastReadData = last
 						}
 					} else {
-						c.heap.put(r)
+						c.heap.put(p)
 					}
 
 					return true
@@ -151,7 +151,7 @@ func (s *Server) Run() error {
 	}
 
 	for {
-		r := &readData{
+		r := &incomingPackage{
 			b: make([]byte, 1432),
 		}
 		r.n, r.rAddr, r.err = conn.ReadFromUDP(r.b)

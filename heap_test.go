@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func heapCheckResult(next *readData, offset int, len int) bool {
+func heapCheckResult(next *incomingPackage, offset int, len int) bool {
 	for i := offset; i < offset+len; i++ {
 		if next != nil {
 			v := binary.BigEndian.Uint64(next.b[65:73])

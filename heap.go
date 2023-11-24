@@ -1,7 +1,7 @@
 package node
 
 type heapItem struct {
-	readData  *readData
+	readData  *incomingPackage
 	indexNext *heapItem
 	indexPrev *heapItem
 	next      *heapItem
@@ -15,7 +15,7 @@ type heap struct {
 	cap  int // required > 0
 }
 
-func (h *heap) put(r *readData) {
+func (h *heap) put(r *incomingPackage) {
 	item := &heapItem{
 		readData: r,
 	}
@@ -87,7 +87,7 @@ LOOP:
 	h.len++
 }
 
-func (h *heap) find(nextMac []byte) (next, last *readData) {
+func (h *heap) find(nextMac []byte) (next, last *incomingPackage) {
 	delete := func(item *heapItem) {
 		if item != nil {
 			if item.prev != nil {

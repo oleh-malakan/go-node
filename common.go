@@ -2,21 +2,21 @@ package node
 
 import "net"
 
-type readData struct {
+type incomingPackage struct {
 	b      []byte
 	n      int
 	readed int
 	rAddr  *net.UDPAddr
 	//	mac     [32]byte
 	nextMac [32]byte
-	next    *readData
+	next    *incomingPackage
 	err     error
 }
 
-type writeData struct {
+type outgoingPackage struct {
 	//prevMac [32]byte
 	mac  [32]byte
-	prev *writeData
+	prev *outgoingPackage
 }
 
 func compareID(a []byte, b []byte) bool {
