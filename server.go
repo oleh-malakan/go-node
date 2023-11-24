@@ -19,7 +19,7 @@ func New(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPA
 		memory: &memory{
 			tlsConfig: tlsConfig,
 			in:        make(chan *incomingPackage, 512),
-			nextDrop:  make(chan *node),
+			nextDrop:  make(chan *container),
 		},
 	}
 	go server.memory.process()

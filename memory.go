@@ -7,9 +7,9 @@ import (
 
 type memory struct {
 	tlsConfig *tls.Config
-	next      *node
+	next      *container
 	in        chan *incomingPackage
-	nextDrop  chan *node
+	nextDrop  chan *container
 }
 
 func (m *memory) process() {
@@ -22,7 +22,7 @@ func (m *memory) process() {
 				if m.next != nil {
 					m.next.in <- p
 				} else {
-					m.next = newNode(p, m.nextDrop, m.tlsConfig)
+					m.next = newContainer(p, m.nextDrop, m.tlsConfig)
 					go m.next.process()
 				}
 			case p.b[0]>>7&1 == 1:
