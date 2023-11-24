@@ -14,57 +14,68 @@ type node struct {
 	in           chan *incomingPackage
 	nextDrop     chan *node
 	drop         chan *node
+	reset        chan *struct{}
 	isDrop       bool
 }
 
 func (n *node) process() {
-	for {
+	for !n.isDrop {
 		select {
 		case p := <-n.in:
-			if !n.isDrop {
-				switch {
-				case p.b[0]>>7&1 == 0:
-					if compareID(n.initalMac[0:32], p.nextMac[0:32]) {
-						continue
-					} else if n.next == nil {
-						n.next = newNode(p, n.nextDrop, n.tlsConfig)
-						go n.next.process()
+			switch {
+			case p.b[0]>>7&1 == 0:
+				if compareID(n.initalMac[0:32], p.nextMac[0:32]) {
+					continue
+				} else if n.next == nil {
+					n.next = newNode(p, n.nextDrop, n.tlsConfig)
+					go n.next.process()
 
-						continue
-					} else {
-						n.next.in <- p
-					}
-				case p.b[0]>>7&1 == 1:
-					w := n.outgoing
-					for w != nil {
-						if compareID(w.mac[0:32], p.b[1:33]) {
-							if compareID(n.lastIncoming.nextMac[0:32], p.b[33:65]) {
-								n.lastIncoming.next = p
-								n.lastIncoming = p
-								var last *incomingPackage
-								n.lastIncoming.next, last = n.heap.find(p.nextMac[0:32])
-								if last != nil {
-									n.lastIncoming = last
-								}
-							} else {
-								n.heap.put(p)
+					continue
+				} else {
+					n.next.in <- p
+				}
+			case p.b[0]>>7&1 == 1:
+				w := n.outgoing
+				for w != nil {
+					if compareID(w.mac[0:32], p.b[1:33]) {
+						if compareID(n.lastIncoming.nextMac[0:32], p.b[33:65]) {
+							n.lastIncoming.next = p
+							n.lastIncoming = p
+							var last *incomingPackage
+							n.lastIncoming.next, last = n.heap.find(p.nextMac[0:32])
+							if last != nil {
+								n.lastIncoming = last
 							}
-
-							continue
+						} else {
+							n.heap.put(p)
 						}
-						w = w.prev
-					}
 
-					if n.next != nil {
-						n.next.in <- p
+						continue
 					}
+					w = w.prev
+				}
+
+				if n.next != nil {
+					n.next.in <- p
 				}
 			}
-		case next := <-n.nextDrop:
-			n.next = next
+		case dropNode := <-n.nextDrop:
+			n.next = dropNode.next
 			if n.next != nil {
-				
+				n.next.drop = n.nextDrop
+				select {
+				case n.next.reset <- nil:
+				default:
+				}
 			}
+		}
+	}
+
+	for {
+		select {
+		case <-n.reset:
+		case n.drop <- n:
+			return
 		}
 	}
 }
@@ -77,6 +88,7 @@ func newNode(incoming *incomingPackage, nextDrop chan *node, tlsConfig *tls.Conf
 		},
 		in:       make(chan *incomingPackage),
 		nextDrop: make(chan *node),
+		reset:    make(chan *struct{}),
 	}
 	new.incoming = incoming
 	new.lastIncoming = incoming
@@ -84,8 +96,4 @@ func newNode(incoming *incomingPackage, nextDrop chan *node, tlsConfig *tls.Conf
 	new.drop = nextDrop
 
 	return new
-}
-
-func dropNextNode(node) {
-
 }

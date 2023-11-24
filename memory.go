@@ -31,8 +31,15 @@ func (m *memory) process() {
 					m.next.in <- p
 				}
 			}
-		case <-m.nextDrop:
-			dropNextNode()
+		case dropNode := <-m.nextDrop:
+			m.next = dropNode.next
+			if m.next != nil {
+				m.next.drop = m.nextDrop
+				select {
+				case m.next.reset <- nil:
+				default:
+				}
+			}
 		}
 	}
 }
