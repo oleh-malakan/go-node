@@ -29,10 +29,10 @@ func New(config Config, tlsConfig *tls.Config, address *net.UDPAddr, nodeAddress
 	}
 
 	return &Server{
-		config:        &config,
 		address:       address,
 		nodeAddresses: nodeAddresses,
 		controller: &controller{
+			config:    &config,
 			tlsConfig: tlsConfig,
 			in:        make(chan *incomingPackage, config.BufferSize),
 			nextDrop:  make(chan *container),
@@ -41,7 +41,6 @@ func New(config Config, tlsConfig *tls.Config, address *net.UDPAddr, nodeAddress
 }
 
 type Server struct {
-	config        *Config
 	address       *net.UDPAddr
 	nodeAddresses []*net.UDPAddr
 

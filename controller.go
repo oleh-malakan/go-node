@@ -6,6 +6,7 @@ import (
 )
 
 type controller struct {
+	config    *Config
 	tlsConfig *tls.Config
 	next      *container
 	in        chan *incomingPackage
@@ -22,7 +23,7 @@ func (c *controller) process() {
 				new := &container{
 					conn: tls.Server(&dataport{}, c.tlsConfig),
 					heap: &heap{
-						cap: 512,
+						cap: c.config.HeapSize,
 					},
 					in:       make(chan *incomingPackage),
 					nextDrop: make(chan *container),
