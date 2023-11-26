@@ -16,15 +16,9 @@ func New(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPA
 		address:       address,
 		nodeAddresses: nodeAddresses,
 		controller: &controller{
-			tlsConfig:    tlsConfig,
-			in:           make(chan *incomingPackage, 512),
-			nextDrop:     make(chan *container),
-			limitPrepare: make(chan *struct{}, 512),
-			blackList: &blackList{
-				in:    make(chan *incomingPackage),
-				out:   make(chan *incomingPackage),
-				black: make(chan [32]byte),
-			},
+			tlsConfig: tlsConfig,
+			in:        make(chan *incomingPackage, 512),
+			nextDrop:  make(chan *container),
 		},
 	}, nil
 }

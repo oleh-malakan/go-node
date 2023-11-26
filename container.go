@@ -3,7 +3,6 @@ package node
 import "crypto/tls"
 
 type container struct {
-	tlsConfig    *tls.Config
 	conn         *tls.Conn
 	lastIncoming *incomingPackage
 	incoming     *incomingPackage
@@ -15,12 +14,6 @@ type container struct {
 	drop         chan *container
 	reset        chan *struct{}
 	isDrop       bool
-	controler    *controller
-}
-
-func (c *container) prepare() {
-	<-c.controler.limitPrepare
-	c.controler.blackList.inPrepare <- c
 }
 
 func (c *container) process() {
