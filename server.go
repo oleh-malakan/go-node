@@ -7,23 +7,41 @@ import (
 	"net"
 )
 
-func New(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
+type Config struct {
+	BufferSize   int // default value if 0
+	ClientsLimit int // default value if 0
+	HeapSize     int // default value if 0
+}
+
+func New(config Config, tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
 	if tlsConfig == nil {
 		return nil, errors.New("require tls config")
 	}
 
+	if config.BufferSize <= 0 {
+		config.BufferSize = 65536
+	}
+	if config.ClientsLimit <= 0 {
+		config.ClientsLimit = 524288
+	}
+	if config.HeapSize <= 0 {
+		config.HeapSize = 512
+	}
+
 	return &Server{
+		config:        &config,
 		address:       address,
 		nodeAddresses: nodeAddresses,
 		controller: &controller{
 			tlsConfig: tlsConfig,
-			in:        make(chan *incomingPackage, 512),
+			in:        make(chan *incomingPackage, config.BufferSize),
 			nextDrop:  make(chan *container),
 		},
 	}, nil
 }
 
 type Server struct {
+	config        *Config
 	address       *net.UDPAddr
 	nodeAddresses []*net.UDPAddr
 
