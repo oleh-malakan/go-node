@@ -8,7 +8,6 @@ import (
 )
 
 type Config struct {
-	BufferSize   int // default value 65536  if 0
 	ClientsLimit int // default value 524288 if 0
 	HeapSize     int // default value 512    if 0
 }
@@ -18,9 +17,6 @@ func New(config Config, tlsConfig *tls.Config, address *net.UDPAddr, nodeAddress
 		return nil, errors.New("require tls config")
 	}
 
-	if config.BufferSize <= 0 {
-		config.BufferSize = 65536
-	}
 	if config.ClientsLimit <= 0 {
 		config.ClientsLimit = 524288
 	}
@@ -34,7 +30,7 @@ func New(config Config, tlsConfig *tls.Config, address *net.UDPAddr, nodeAddress
 		controller: &controller{
 			config:    &config,
 			tlsConfig: tlsConfig,
-			in:        make(chan *incomingPackage, config.BufferSize),
+			in:        make(chan *incomingPackage),
 			nextDrop:  make(chan *container),
 		},
 	}, nil
