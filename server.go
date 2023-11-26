@@ -8,9 +8,9 @@ import (
 )
 
 type Config struct {
-	BufferSize   int // default value if 0
-	ClientsLimit int // default value if 0
-	HeapSize     int // default value if 0
+	BufferSize   int // default value 65536  if 0
+	ClientsLimit int // default value 524288 if 0
+	HeapSize     int // default value 512    if 0
 }
 
 func New(config Config, tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
