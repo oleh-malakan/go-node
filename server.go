@@ -9,7 +9,7 @@ import (
 
 type Config struct {
 	ClientsLimit int // default value 524288 if 0
-	HeapSize     int // default value 512    if 0
+	HeapCap      int // default value 512    if 0
 }
 
 func New(config Config, tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
@@ -20,8 +20,8 @@ func New(config Config, tlsConfig *tls.Config, address *net.UDPAddr, nodeAddress
 	if config.ClientsLimit <= 0 {
 		config.ClientsLimit = 524288
 	}
-	if config.HeapSize <= 0 {
-		config.HeapSize = 512
+	if config.HeapCap <= 0 {
+		config.HeapCap = 512
 	}
 
 	return &Server{

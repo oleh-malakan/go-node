@@ -23,7 +23,7 @@ func (c *controller) process() {
 				new := &container{
 					conn: tls.Server(&dataport{}, c.tlsConfig),
 					heap: &heap{
-						cap: c.config.HeapSize,
+						cap: c.config.HeapCap,
 					},
 					in:       make(chan *incomingPackage),
 					nextDrop: make(chan *container),
