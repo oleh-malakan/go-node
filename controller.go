@@ -22,7 +22,6 @@ func (c *controller) do() {
 				i.nextMac = sha256.Sum256(i.b[1:i.n])
 				new := &container{
 					core: &core{
-						conn: tls.Server(&dataport{}, c.tlsConfig),
 						heap: &heap{
 							cap: c.config.HeapCap,
 						},
@@ -31,6 +30,7 @@ func (c *controller) do() {
 					nextDrop: make(chan *container),
 					reset:    make(chan *struct{}),
 				}
+				new.core.conn = tls.Server(new.core, c.tlsConfig)
 				new.core.incoming = i
 				new.core.lastIncoming = i
 				new.next = c.next

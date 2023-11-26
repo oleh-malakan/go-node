@@ -12,7 +12,6 @@ func Dial(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Client, error)
 	}
 
 	client := &Client{}
-	client.conn = tls.Client(&dataport{}, tlsConfig)
 	err := client.dial(nodeAddresses...)
 	if err != nil {
 		return nil, err
@@ -21,9 +20,7 @@ func Dial(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Client, error)
 	return client, nil
 }
 
-type Client struct {
-	conn *tls.Conn
-}
+type Client struct{}
 
 func (c *Client) Connect(nodeID string) (*Connection, error) {
 	return &Connection{}, nil
@@ -36,23 +33,9 @@ func (c *Client) dial(nodeAddresses ...*net.UDPAddr) error {
 			return err
 		}
 
-		go c.handshake()
-
-		go func() {
-			for {
-				select {
-				case b := <-c.cWrite:
-
-				}
-			}
-
-		}()
+		for {
+			
+		}
 	*/
 	return nil
-}
-
-func (c *Client) handshake() {
-	if err := c.conn.Handshake(); err != nil {
-
-	}
 }

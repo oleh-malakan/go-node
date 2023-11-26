@@ -1,6 +1,10 @@
 package node
 
-import "crypto/tls"
+import (
+	"crypto/tls"
+	"net"
+	"time"
+)
 
 type core struct {
 	conn         *tls.Conn
@@ -28,4 +32,36 @@ func (c *core) process() {
 	select {
 	default:
 	}
+}
+
+func (c *core) Read(b []byte) (n int, err error) {
+	return
+}
+
+func (c *core) Write(b []byte) (n int, err error) {
+	return
+}
+
+func (c *core) Close() error {
+	return nil
+}
+
+func (c *core) LocalAddr() net.Addr {
+	return nil
+}
+
+func (c *core) RemoteAddr() net.Addr {
+	return nil
+}
+
+func (c *core) SetDeadline(t time.Time) error {
+	return nil
+}
+
+func (c *core) SetReadDeadline(t time.Time) error {
+	return nil
+}
+
+func (c *core) SetWriteDeadline(t time.Time) error {
+	return nil
 }
