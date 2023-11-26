@@ -1,50 +1,38 @@
 package node
 
-import "crypto/tls"
+import "time"
 
 type container struct {
-	conn         *tls.Conn
-	lastIncoming *incomingPackage
-	incoming     *incomingPackage
-	outgoing     *outgoingPackage
-	heap         *heap
-	next         *container
-	in           chan *incomingPackage
-	nextDrop     chan *container
-	drop         chan *container
-	reset        chan *struct{}
-	isDrop       bool
+	core     *core
+	next     *container
+	in       chan *incomingPackage
+	nextDrop chan *container
+	drop     chan *container
+	reset    chan *struct{}
+	isDrop   bool
 }
 
-func (c *container) process() {
+func (c *container) do() {
 	for !c.isDrop {
 		select {
-		case p := <-c.in:
-			w := c.outgoing
-			for w != nil {
-				if compareID(w.mac[0:32], p.b[1:33]) {
-					if compareID(c.lastIncoming.nextMac[0:32], p.b[33:65]) {
-						c.lastIncoming.next = p
-						c.lastIncoming = p
-						var last *incomingPackage
-						c.lastIncoming.next, last = c.heap.find(p.nextMac[0:32])
-						if last != nil {
-							c.lastIncoming = last
-						}
-					} else {
-						c.heap.put(p)
-					}
-
+		case i := <-c.in:
+			o := c.core.outgoing
+			for o != nil {
+				if compareID(o.mac[0:32], i.b[1:33]) {
+					c.core.in(i)
 					continue
 				}
-				w = w.prev
+				o = o.prev
 			}
 
 			if c.next != nil {
-				c.next.in <- p
+				c.next.in <- i
 			}
-		case dropNode := <-c.nextDrop:
-			c.next = dropNode.next
+		default:
+			c.core.process()
+			time.Sleep(0)
+		case d := <-c.nextDrop:
+			c.next = d.next
 			if c.next != nil {
 				c.next.drop = c.nextDrop
 				select {
@@ -57,9 +45,9 @@ func (c *container) process() {
 
 	for {
 		select {
-		case p := <-c.in:
+		case i := <-c.in:
 			if c.next != nil {
-				c.next.in <- p
+				c.next.in <- i
 			}
 		case <-c.reset:
 		case c.drop <- c:

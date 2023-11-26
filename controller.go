@@ -13,35 +13,37 @@ type controller struct {
 	nextDrop  chan *container
 }
 
-func (c *controller) process() {
+func (c *controller) do() {
 	for {
 		select {
-		case p := <-c.in:
+		case i := <-c.in:
 			switch {
-			case p.b[0]>>7&1 == 0:
-				p.nextMac = sha256.Sum256(p.b[1:p.n])
+			case i.b[0]>>7&1 == 0:
+				i.nextMac = sha256.Sum256(i.b[1:i.n])
 				new := &container{
-					conn: tls.Server(&dataport{}, c.tlsConfig),
-					heap: &heap{
-						cap: c.config.HeapCap,
+					core: &core{
+						conn: tls.Server(&dataport{}, c.tlsConfig),
+						heap: &heap{
+							cap: c.config.HeapCap,
+						},
 					},
 					in:       make(chan *incomingPackage),
 					nextDrop: make(chan *container),
 					reset:    make(chan *struct{}),
 				}
-				new.incoming = p
-				new.lastIncoming = p
+				new.core.incoming = i
+				new.core.lastIncoming = i
 				new.next = c.next
 				c.next = new
-				go new.process()
-			case p.b[0]>>7&1 == 1:
-				p.nextMac = sha256.Sum256(p.b[65:p.n])
+				go new.do()
+			case i.b[0]>>7&1 == 1:
+				i.nextMac = sha256.Sum256(i.b[65:i.n])
 				if c.next != nil {
-					c.next.in <- p
+					c.next.in <- i
 				}
 			}
-		case dropNode := <-c.nextDrop:
-			c.next = dropNode.next
+		case d := <-c.nextDrop:
+			c.next = d.next
 			if c.next != nil {
 				c.next.drop = c.nextDrop
 				select {

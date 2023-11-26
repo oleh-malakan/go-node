@@ -1,7 +1,7 @@
 package node
 
 type heapItem struct {
-	readData  *incomingPackage
+	incoming  *incomingPackage
 	indexNext *heapItem
 	indexPrev *heapItem
 	next      *heapItem
@@ -15,9 +15,9 @@ type heap struct {
 	cap  int // required > 0
 }
 
-func (h *heap) put(r *incomingPackage) {
+func (h *heap) put(incoming *incomingPackage) {
 	item := &heapItem{
-		readData: r,
+		incoming: incoming,
 	}
 
 LOOP:
@@ -44,13 +44,13 @@ LOOP:
 
 		heap := h.heap
 		for heap != nil && (item.indexPrev == nil || item.indexNext == nil) {
-			if compareID(r.b[33:65], heap.readData.b[33:65]) {
+			if compareID(incoming.b[33:65], heap.incoming.b[33:65]) {
 				return
 			}
-			if item.indexNext == nil && compareID(r.nextMac[0:32], heap.readData.b[33:65]) {
+			if item.indexNext == nil && compareID(incoming.nextMac[0:32], heap.incoming.b[33:65]) {
 				item.indexNext = heap
 			}
-			if item.indexPrev == nil && compareID(heap.readData.nextMac[0:32], r.b[33:65]) {
+			if item.indexPrev == nil && compareID(heap.incoming.nextMac[0:32], incoming.b[33:65]) {
 				item.indexPrev = heap
 				if item.indexPrev.indexNext != nil {
 					return
@@ -111,13 +111,13 @@ func (h *heap) find(nextMac []byte) (next, last *incomingPackage) {
 
 	heap := h.heap
 	for heap != nil {
-		if compareID(nextMac, heap.readData.b[33:65]) {
-			next = heap.readData
+		if compareID(nextMac, heap.incoming.b[33:65]) {
+			next = heap.incoming
 			last = next
 			delete(heap)
 			index := heap.indexNext
 			for index != nil {
-				last.next = index.readData
+				last.next = index.incoming
 				last = last.next
 				delete(index)
 				index = index.indexNext

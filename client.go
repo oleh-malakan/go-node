@@ -11,11 +11,8 @@ func Dial(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Client, error)
 		return nil, errors.New("node address not specified")
 	}
 
-	client := &Client{
-		cRead:  make(chan []byte),
-		cWrite: make(chan []byte),
-	}
-	client.conn = tls.Client(&dataport{read: client.cRead, write: client.cWrite}, tlsConfig)
+	client := &Client{}
+	client.conn = tls.Client(&dataport{}, tlsConfig)
 	err := client.dial(nodeAddresses...)
 	if err != nil {
 		return nil, err
@@ -25,9 +22,7 @@ func Dial(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Client, error)
 }
 
 type Client struct {
-	conn   *tls.Conn
-	cRead  chan []byte
-	cWrite chan []byte
+	conn *tls.Conn
 }
 
 func (c *Client) Connect(nodeID string) (*Connection, error) {

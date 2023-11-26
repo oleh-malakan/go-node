@@ -62,15 +62,15 @@ func (s *Server) Run() error {
 		return err
 	}
 
-	go s.controller.process()
+	go s.controller.do()
 
 	for {
-		incoming := &incomingPackage{
+		i := &incomingPackage{
 			b: make([]byte, 1432),
 		}
-		incoming.n, incoming.rAddr, incoming.err = conn.ReadFromUDP(incoming.b)
+		i.n, i.rAddr, i.err = conn.ReadFromUDP(i.b)
 
-		s.controller.in <- incoming
+		s.controller.in <- i
 	}
 }
 
