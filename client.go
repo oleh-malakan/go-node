@@ -11,26 +11,21 @@ func Dial(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Client, error)
 		return nil, errors.New("node address not specified")
 	}
 
-	client := &Client{
-		controller: &clientController{},
-	}
+	client := &Client{}
 
-	go client.controller.process()
+	go client.process()
 
 	return client, nil
 }
 
 type Client struct {
-	controller *clientController
 }
 
 func (c *Client) Connect(nodeID string) (*Connection, error) {
 	return &Connection{}, nil
 }
 
-type clientController struct{}
-
-func (c *clientController) process() {
+func (c *Client) process() {
 
 }
 

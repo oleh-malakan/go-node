@@ -25,22 +25,24 @@ func New(config Config, tlsConfig *tls.Config, address *net.UDPAddr, nodeAddress
 	}
 
 	return &Server{
+		config:        &config,
+		tlsConfig:     tlsConfig,
 		address:       address,
 		nodeAddresses: nodeAddresses,
-		controller: &serverController{
-			config:    &config,
-			tlsConfig: tlsConfig,
-			in:        make(chan *incomingPackage),
-			nextDrop:  make(chan *serverContainer),
-		},
+		in:            make(chan *incomingPackage),
+		nextDrop:      make(chan *serverContainer),
 	}, nil
 }
 
 type Server struct {
+	config        *Config
+	tlsConfig     *tls.Config
 	address       *net.UDPAddr
 	nodeAddresses []*net.UDPAddr
 
-	controller *serverController
+	next     *serverContainer
+	in       chan *incomingPackage
+	nextDrop chan *serverContainer
 }
 
 func (s *Server) Handler(nodeID string, f func(connection *Connection)) (*Handler, error) {
@@ -62,7 +64,7 @@ func (s *Server) Run() error {
 		return err
 	}
 
-	go s.controller.process()
+	go s.process()
 
 	for {
 		i := &incomingPackage{
@@ -70,7 +72,48 @@ func (s *Server) Run() error {
 		}
 		i.n, i.rAddr, i.err = conn.ReadFromUDP(i.b)
 
-		s.controller.in <- i
+		s.in <- i
+	}
+}
+
+func (s *Server) process() {
+	for {
+		select {
+		case i := <-s.in:
+			switch {
+			case i.b[0]>>7&1 == 0:
+				new := &serverContainer{
+					core: &core{
+						iPKey: sha256.Sum256(i.b[1:i.n]),
+						heap: &heap{
+							cap: s.config.HeapCap,
+						},
+					},
+					in:       make(chan *incomingPackage),
+					nextDrop: make(chan *serverContainer),
+					reset:    make(chan *struct{}),
+				}
+				new.core.conn = tls.Server(new.core, s.tlsConfig)
+				new.core.incoming = i
+				new.core.lastIncoming = i
+				new.next = s.next
+				s.next = new
+				go new.process()
+			case i.b[0]>>7&1 == 1:
+				if s.next != nil {
+					s.next.in <- i
+				}
+			}
+		case d := <-s.nextDrop:
+			s.next = d.next
+			if s.next != nil {
+				s.next.drop = s.nextDrop
+				select {
+				case s.next.reset <- nil:
+				default:
+				}
+			}
+		}
 	}
 }
 
@@ -95,55 +138,6 @@ func (l *Listener) Accept() (*Connection, error) {
 
 func (l *Listener) Close() error {
 	return nil
-}
-
-type serverController struct {
-	config    *Config
-	tlsConfig *tls.Config
-	next      *serverContainer
-	in        chan *incomingPackage
-	nextDrop  chan *serverContainer
-}
-
-func (c *serverController) process() {
-	for {
-		select {
-		case i := <-c.in:
-			switch {
-			case i.b[0]>>7&1 == 0:
-				new := &serverContainer{
-					core: &core{
-						iPKey: sha256.Sum256(i.b[1:i.n]),
-						heap: &heap{
-							cap: c.config.HeapCap,
-						},
-					},
-					in:       make(chan *incomingPackage),
-					nextDrop: make(chan *serverContainer),
-					reset:    make(chan *struct{}),
-				}
-				new.core.conn = tls.Server(new.core, c.tlsConfig)
-				new.core.incoming = i
-				new.core.lastIncoming = i
-				new.next = c.next
-				c.next = new
-				go new.process()
-			case i.b[0]>>7&1 == 1:
-				if c.next != nil {
-					c.next.in <- i
-				}
-			}
-		case d := <-c.nextDrop:
-			c.next = d.next
-			if c.next != nil {
-				c.next.drop = c.nextDrop
-				select {
-				case c.next.reset <- nil:
-				default:
-				}
-			}
-		}
-	}
 }
 
 type serverContainer struct {
