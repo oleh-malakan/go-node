@@ -27,3 +27,15 @@ type Client struct {
 func (c *Client) Connect(nodeID string) (*Connection, error) {
 	return &Connection{}, nil
 }
+
+type clientController struct{}
+
+func (c *clientController) process() {
+
+}
+
+type clientContainer struct{}
+
+func (c *clientContainer) process() {
+
+}
