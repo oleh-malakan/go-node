@@ -62,7 +62,7 @@ func (s *Server) Run() error {
 		return err
 	}
 
-	go s.controller.do()
+	go s.controller.process()
 
 	for {
 		i := &incomingPackage{

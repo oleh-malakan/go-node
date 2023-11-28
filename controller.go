@@ -13,15 +13,15 @@ type controller struct {
 	nextDrop  chan *container
 }
 
-func (c *controller) do() {
+func (c *controller) process() {
 	for {
 		select {
 		case i := <-c.in:
 			switch {
 			case i.b[0]>>7&1 == 0:
-				i.nextMac = sha256.Sum256(i.b[1:i.n])
 				new := &container{
 					core: &core{
+						iPKey: sha256.Sum256(i.b[1:i.n]),
 						heap: &heap{
 							cap: c.config.HeapCap,
 						},
@@ -35,9 +35,8 @@ func (c *controller) do() {
 				new.core.lastIncoming = i
 				new.next = c.next
 				c.next = new
-				go new.do()
+				go new.process()
 			case i.b[0]>>7&1 == 1:
-				i.nextMac = sha256.Sum256(i.b[65:i.n])
 				if c.next != nil {
 					c.next.in <- i
 				}

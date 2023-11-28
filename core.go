@@ -1,6 +1,7 @@
 package node
 
 import (
+	"crypto/sha256"
 	"crypto/tls"
 	"net"
 	"time"
@@ -10,27 +11,27 @@ type core struct {
 	conn         *tls.Conn
 	lastIncoming *incomingPackage
 	incoming     *incomingPackage
+	iPKey        [32]byte
 	outgoing     *outgoingPackage
 	heap         *heap
 }
 
 func (c *core) in(incoming *incomingPackage) {
-	if compareID(c.lastIncoming.nextMac[0:32], incoming.b[33:65]) {
-		c.lastIncoming.next = incoming
-		c.lastIncoming = incoming
-		var last *incomingPackage
-		c.lastIncoming.next, last = c.heap.find(incoming.nextMac[0:32])
-		if last != nil {
-			c.lastIncoming = last
+	if compare8(c.lastIncoming.b[25:33], incoming.b[17:25]) {
+		for incoming != nil {
+			incoming.b = append(incoming.b, c.iPKey[:]...)
+			nPkey := sha256.Sum256(incoming.b[33:])
+			if compare8(nPkey[:8], incoming.b[25:33]) {
+				c.iPKey = nPkey
+				c.lastIncoming.next = incoming
+				c.lastIncoming = incoming
+				incoming = c.heap.find(incoming.b[25:33])
+			} else {
+				break
+			}
 		}
 	} else {
 		c.heap.put(incoming)
-	}
-}
-
-func (c *core) process() {
-	select {
-	default:
 	}
 }
 

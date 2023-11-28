@@ -1,7 +1,5 @@
 package node
 
-import "time"
-
 type container struct {
 	core     *core
 	next     *container
@@ -12,13 +10,13 @@ type container struct {
 	isDrop   bool
 }
 
-func (c *container) do() {
+func (c *container) process() {
 	for !c.isDrop {
 		select {
 		case i := <-c.in:
 			o := c.core.outgoing
 			for o != nil {
-				if compareID(o.mac[0:32], i.b[1:33]) {
+				if compare16(o.b[1:17], i.b[1:17]) {
 					c.core.in(i)
 					continue
 				}
@@ -28,9 +26,6 @@ func (c *container) do() {
 			if c.next != nil {
 				c.next.in <- i
 			}
-		default:
-			c.core.process()
-			time.Sleep(0)
 		case d := <-c.nextDrop:
 			c.next = d.next
 			if c.next != nil {
