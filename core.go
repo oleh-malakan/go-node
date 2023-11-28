@@ -7,6 +7,21 @@ import (
 	"time"
 )
 
+type incomingPackage struct {
+	b      []byte
+	n      int
+	offset int
+	rAddr  *net.UDPAddr
+	next   *incomingPackage
+	err    error
+}
+
+type outgoingPackage struct {
+	b    []byte
+	n    int
+	prev *outgoingPackage
+}
+
 type core struct {
 	conn         *tls.Conn
 	lastIncoming *incomingPackage
@@ -65,4 +80,16 @@ func (c *core) SetReadDeadline(t time.Time) error {
 
 func (c *core) SetWriteDeadline(t time.Time) error {
 	return nil
+}
+
+func compare8(a []byte, b []byte) bool {
+	return a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3] &&
+		a[4] == b[4] && a[5] == b[5] && a[6] == b[6] && a[7] == b[7]
+}
+
+func compare16(a []byte, b []byte) bool {
+	return a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3] &&
+		a[4] == b[4] && a[5] == b[5] && a[6] == b[6] && a[7] == b[7] &&
+		a[8] == b[8] && a[9] == b[9] && a[10] == b[10] && a[11] == b[11] &&
+		a[12] == b[12] && a[13] == b[13] && a[14] == b[14] && a[15] == b[15]
 }
