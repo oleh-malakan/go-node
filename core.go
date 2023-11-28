@@ -27,7 +27,7 @@ func (c *core) in(incoming *incomingPackage) {
 				c.lastIncoming = incoming
 				incoming = c.heap.find(incoming.b[25:33])
 			} else {
-				break
+				incoming = c.heap.find(c.lastIncoming.b[25:33])
 			}
 		}
 	} else {

@@ -5,21 +5,21 @@ import (
 	"crypto/tls"
 )
 
-type controller struct {
+type serverController struct {
 	config    *Config
 	tlsConfig *tls.Config
-	next      *container
+	next      *serverContainer
 	in        chan *incomingPackage
-	nextDrop  chan *container
+	nextDrop  chan *serverContainer
 }
 
-func (c *controller) process() {
+func (c *serverController) process() {
 	for {
 		select {
 		case i := <-c.in:
 			switch {
 			case i.b[0]>>7&1 == 0:
-				new := &container{
+				new := &serverContainer{
 					core: &core{
 						iPKey: sha256.Sum256(i.b[1:i.n]),
 						heap: &heap{
@@ -27,7 +27,7 @@ func (c *controller) process() {
 						},
 					},
 					in:       make(chan *incomingPackage),
-					nextDrop: make(chan *container),
+					nextDrop: make(chan *serverContainer),
 					reset:    make(chan *struct{}),
 				}
 				new.core.conn = tls.Server(new.core, c.tlsConfig)

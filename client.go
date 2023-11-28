@@ -11,31 +11,19 @@ func Dial(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Client, error)
 		return nil, errors.New("node address not specified")
 	}
 
-	client := &Client{}
-	err := client.dial(nodeAddresses...)
-	if err != nil {
-		return nil, err
+	client := &Client{
+		controller: &clientController{},
 	}
+
+	go client.controller.process()
 
 	return client, nil
 }
 
-type Client struct{}
+type Client struct {
+	controller *clientController
+}
 
 func (c *Client) Connect(nodeID string) (*Connection, error) {
 	return &Connection{}, nil
-}
-
-func (c *Client) dial(nodeAddresses ...*net.UDPAddr) error {
-	/*
-		conn, err := net.DialUDP("udp", nil, nodeAddresses[0])
-		if err != nil {
-			return err
-		}
-
-		for {
-			
-		}
-	*/
-	return nil
 }

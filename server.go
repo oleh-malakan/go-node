@@ -27,11 +27,11 @@ func New(config Config, tlsConfig *tls.Config, address *net.UDPAddr, nodeAddress
 	return &Server{
 		address:       address,
 		nodeAddresses: nodeAddresses,
-		controller: &controller{
+		controller: &serverController{
 			config:    &config,
 			tlsConfig: tlsConfig,
 			in:        make(chan *incomingPackage),
-			nextDrop:  make(chan *container),
+			nextDrop:  make(chan *serverContainer),
 		},
 	}, nil
 }
@@ -40,7 +40,7 @@ type Server struct {
 	address       *net.UDPAddr
 	nodeAddresses []*net.UDPAddr
 
-	controller *controller
+	controller *serverController
 }
 
 func (s *Server) Handler(nodeID string, f func(connection *Connection)) (*Handler, error) {

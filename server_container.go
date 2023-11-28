@@ -1,16 +1,16 @@
 package node
 
-type container struct {
+type serverContainer struct {
 	core     *core
-	next     *container
+	next     *serverContainer
 	in       chan *incomingPackage
-	nextDrop chan *container
-	drop     chan *container
+	nextDrop chan *serverContainer
+	drop     chan *serverContainer
 	reset    chan *struct{}
 	isDrop   bool
 }
 
-func (c *container) process() {
+func (c *serverContainer) process() {
 	for !c.isDrop {
 		select {
 		case i := <-c.in:
