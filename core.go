@@ -22,46 +22,64 @@ func (c *Connection) Close() error {
 }
 
 type incomingPackage struct {
-	b      []byte
-	n      int
-	offset int
-	rAddr  *net.UDPAddr
-	next   *incomingPackage
-	err    error
+	b       []byte
+	n       int
+	offset  int
+	rAddr   *net.UDPAddr
+	next    *incomingPackage
+	err     error
+	cid     uint64
+	pid     uint32
+	prevPid uint32
 }
 
 type outgoingPackage struct {
 	b    []byte
 	n    int
 	prev *outgoingPackage
+	pKey [28]byte
+	cid  uint64
 }
 
 type core struct {
 	conn         *tls.Conn
 	lastIncoming *incomingPackage
 	incoming     *incomingPackage
-	iPKey        [32]byte
 	outgoing     *outgoingPackage
 	heap         *heap
 }
 
-func (c *core) in(incoming *incomingPackage) {
-	if compare8(c.lastIncoming.b[25:33], incoming.b[17:25]) {
-		for incoming != nil {
-			incoming.b = append(incoming.b, c.iPKey[:]...)
-			nPkey := sha256.Sum256(incoming.b[33:])
-			if compare8(nPkey[:8], incoming.b[25:33]) {
-				c.iPKey = nPkey
-				c.lastIncoming.next = incoming
-				c.lastIncoming = incoming
-				incoming = c.heap.find(incoming.b[25:33])
-			} else {
-				incoming = c.heap.find(c.lastIncoming.b[25:33])
+func (c *core) in(incoming *incomingPackage) bool {
+	o := c.outgoing
+	for o != nil {
+		if incoming.cid == o.cid {
+			copy(incoming.b[1432:], o.pKey[:])
+			sig := sha256.Sum224(incoming.b[4:])
+			if incoming.b[1] == sig[1] && incoming.b[2] == sig[2] && incoming.b[3] == sig[3] {
+				goto CONTINUE
 			}
+		}
+		o = o.prev
+	}
+
+	return false
+CONTINUE:
+	incoming.prevPid = pid(incoming.b[10:13])
+	incoming.pid = pid(incoming.b[13:16])
+
+	if c.lastIncoming.pid == incoming.prevPid {
+		c.lastIncoming.next = incoming
+		c.lastIncoming = incoming
+
+		for incoming = c.heap.find(incoming.pid); incoming != nil; {
+			c.lastIncoming.next = incoming
+			c.lastIncoming = incoming
 		}
 	} else {
 		c.heap.put(incoming)
 	}
+
+	return true
 }
 
 func (c *core) Read(b []byte) (n int, err error) {
@@ -112,9 +130,11 @@ type heap struct {
 func (h *heap) put(incoming *incomingPackage) {
 	cur := h.heap
 	for cur != nil {
-		if compare16(cur.incoming.b[17:33], incoming.b[17:33]) {
+		if cur.incoming.pid == incoming.pid {
 			return
 		}
+
+		cur = cur.next
 	}
 
 	if h.cap <= h.len {
@@ -141,10 +161,10 @@ func (h *heap) put(incoming *incomingPackage) {
 	h.len++
 }
 
-func (h *heap) find(next []byte) *incomingPackage {
+func (h *heap) find(pid uint32) *incomingPackage {
 	cur := h.heap
 	for cur != nil {
-		if compare8(next, cur.incoming.b[17:25]) {
+		if pid == cur.incoming.prevPid {
 			if cur.prev != nil {
 				cur.prev.next = cur.next
 			} else {
@@ -163,14 +183,11 @@ func (h *heap) find(next []byte) *incomingPackage {
 	return nil
 }
 
-func compare8(a []byte, b []byte) bool {
-	return a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3] &&
-		a[4] == b[4] && a[5] == b[5] && a[6] == b[6] && a[7] == b[7]
+func cid(b []byte) uint64 {
+	return uint64(b[0]) | uint64(b[1])<<8 | uint64(b[2])<<16 | uint64(b[3])<<24 |
+		uint64(b[4])<<32 | uint64(b[5])<<40
 }
 
-func compare16(a []byte, b []byte) bool {
-	return a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3] &&
-		a[4] == b[4] && a[5] == b[5] && a[6] == b[6] && a[7] == b[7] &&
-		a[8] == b[8] && a[9] == b[9] && a[10] == b[10] && a[11] == b[11] &&
-		a[12] == b[12] && a[13] == b[13] && a[14] == b[14] && a[15] == b[15]
+func pid(b []byte) uint32 {
+	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16
 }

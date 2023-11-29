@@ -68,7 +68,7 @@ func (s *Server) Run() error {
 
 	for {
 		i := &incomingPackage{
-			b: make([]byte, 1432),
+			b: make([]byte, 1460),
 		}
 		i.n, i.rAddr, i.err = conn.ReadFromUDP(i.b)
 
@@ -84,7 +84,6 @@ func (s *Server) process() {
 			case i.b[0]>>7&1 == 0:
 				new := &serverContainer{
 					core: &core{
-						iPKey: sha256.Sum256(i.b[1:i.n]),
 						heap: &heap{
 							cap: s.config.HeapCap,
 						},
@@ -100,6 +99,7 @@ func (s *Server) process() {
 				s.next = new
 				go new.process()
 			case i.b[0]>>7&1 == 1:
+				i.cid = cid(i.b[4:10])
 				if s.next != nil {
 					s.next.in <- i
 				}
@@ -154,16 +154,7 @@ func (c *serverContainer) process() {
 	for !c.isDrop {
 		select {
 		case i := <-c.in:
-			o := c.core.outgoing
-			for o != nil {
-				if compare16(o.b[1:17], i.b[1:17]) {
-					c.core.in(i)
-					continue
-				}
-				o = o.prev
-			}
-
-			if c.next != nil {
+			if !c.core.in(i) && c.next != nil {
 				c.next.in <- i
 			}
 		case d := <-c.nextDrop:
