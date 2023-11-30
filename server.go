@@ -37,8 +37,8 @@ func (s *Server) Listen(nodeID string) (*Listener, error) {
 	return &Listener{}, nil
 }
 
-func (s *Server) HandshakeProcess() {
-
+func (s *Server) HandshakeProcess() error {
+	return nil
 }
 
 // clientsLimit default value 524288 if 0
