@@ -7,7 +7,7 @@ import (
 	"net"
 )
 
-func New(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Server, error) {
+func New(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
 	if tlsConfig == nil {
 		return nil, errors.New("require tls config")
 	}
@@ -37,12 +37,8 @@ func (s *Server) Listen(nodeID string) (*Listener, error) {
 	return &Listener{}, nil
 }
 
-func (s *Server) HandshakeProcess() error {
-	return nil
-}
-
 // clientsLimit default value 524288 if 0
-func (s *Server) Run(address *net.UDPAddr, clientsLimit int) error {
+func (s *Server) Run(clientsLimit int) error {
 	if clientsLimit <= 0 {
 		clientsLimit = 524288
 	}
