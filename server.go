@@ -99,7 +99,7 @@ func (s *Server) process() {
 				s.next = new
 				go new.process()
 			case i.b[0]>>7&1 == 1:
-				i.cid = cid(i.b[4:10])
+				i.cid = bToID(i.b[4:7])
 				if s.next != nil {
 					s.next.in <- i
 				}

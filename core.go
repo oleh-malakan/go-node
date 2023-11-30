@@ -28,7 +28,7 @@ type incomingPackage struct {
 	rAddr   *net.UDPAddr
 	next    *incomingPackage
 	err     error
-	cid     uint64
+	cid     uint32
 	pid     uint32
 	prevPid uint32
 }
@@ -38,7 +38,7 @@ type outgoingPackage struct {
 	n    int
 	prev *outgoingPackage
 	pKey [28]byte
-	cid  uint64
+	cid  uint32
 }
 
 type core struct {
@@ -64,8 +64,8 @@ func (c *core) in(incoming *incomingPackage) bool {
 
 	return false
 CONTINUE:
-	incoming.prevPid = pid(incoming.b[10:13])
-	incoming.pid = pid(incoming.b[13:16])
+	incoming.prevPid = bToID(incoming.b[7:10])
+	incoming.pid = bToID(incoming.b[10:13])
 
 	if c.lastIncoming.pid == incoming.prevPid {
 		c.lastIncoming.next = incoming
@@ -183,11 +183,6 @@ func (h *heap) find(pid uint32) *incomingPackage {
 	return nil
 }
 
-func cid(b []byte) uint64 {
-	return uint64(b[0]) | uint64(b[1])<<8 | uint64(b[2])<<16 | uint64(b[3])<<24 |
-		uint64(b[4])<<32 | uint64(b[5])<<40
-}
-
-func pid(b []byte) uint32 {
+func bToID(b []byte) uint32 {
 	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16
 }
