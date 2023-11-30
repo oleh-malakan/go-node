@@ -30,7 +30,7 @@ func New(config Config, tlsConfig *tls.Config, address *net.UDPAddr, nodeAddress
 		address:       address,
 		nodeAddresses: nodeAddresses,
 		in:            make(chan *incomingPackage),
-		nextDrop:      make(chan *serverContainer),
+		nextDrop:      make(chan *core),
 	}, nil
 }
 
@@ -40,9 +40,9 @@ type Server struct {
 	address       *net.UDPAddr
 	nodeAddresses []*net.UDPAddr
 
-	next     *serverContainer
+	next     *core
 	in       chan *incomingPackage
-	nextDrop chan *serverContainer
+	nextDrop chan *core
 }
 
 func (s *Server) Handler(nodeID string, f func(connection *Connection)) (*Handler, error) {
@@ -82,22 +82,20 @@ func (s *Server) process() {
 		case i := <-s.in:
 			switch {
 			case i.b[0]>>7&1 == 0:
-				new := &serverContainer{
-					core: &core{
-						heap: &heap{
-							cap: s.config.HeapCap,
-						},
+				core := &core{
+					heap: &heap{
+						cap: s.config.HeapCap,
 					},
 					in:       make(chan *incomingPackage),
-					nextDrop: make(chan *serverContainer),
+					nextDrop: make(chan *core),
 					reset:    make(chan *struct{}),
 				}
-				new.core.conn = tls.Server(new.core, s.tlsConfig)
-				new.core.incoming = i
-				new.core.lastIncoming = i
-				new.next = s.next
-				s.next = new
-				go new.process()
+				core.conn = tls.Server(core, s.tlsConfig)
+				core.incoming = i
+				core.lastIncoming = i
+				core.next = s.next
+				s.next = core
+				go core.process()
 			case i.b[0]>>7&1 == 1:
 				i.cid = bToID(i.b[4:7])
 				if s.next != nil {
@@ -138,46 +136,4 @@ func (l *Listener) Accept() (*Connection, error) {
 
 func (l *Listener) Close() error {
 	return nil
-}
-
-type serverContainer struct {
-	core     *core
-	next     *serverContainer
-	in       chan *incomingPackage
-	nextDrop chan *serverContainer
-	drop     chan *serverContainer
-	reset    chan *struct{}
-	isDrop   bool
-}
-
-func (c *serverContainer) process() {
-	for !c.isDrop {
-		select {
-		case i := <-c.in:
-			if !c.core.in(i) && c.next != nil {
-				c.next.in <- i
-			}
-		case d := <-c.nextDrop:
-			c.next = d.next
-			if c.next != nil {
-				c.next.drop = c.nextDrop
-				select {
-				case c.next.reset <- nil:
-				default:
-				}
-			}
-		}
-	}
-
-	for {
-		select {
-		case i := <-c.in:
-			if c.next != nil {
-				c.next.in <- i
-			}
-		case <-c.reset:
-		case c.drop <- c:
-			return
-		}
-	}
 }

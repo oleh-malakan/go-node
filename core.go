@@ -41,7 +41,31 @@ type outgoingPackage struct {
 	cid  uint32
 }
 
+type reader struct {
+	conn *net.UDPConn
+	core *core
+}
+
+func (r *reader) process() {
+	for {
+		i := &incomingPackage{
+			b: make([]byte, 1460),
+		}
+		i.n, i.rAddr, i.err = r.conn.ReadFromUDP(i.b)
+
+		r.core.in <- i
+	}
+}
+
 type core struct {
+	reader   *reader
+	next     *core
+	in       chan *incomingPackage
+	nextDrop chan *core
+	drop     chan *core
+	reset    chan *struct{}
+	isDrop   bool
+
 	conn         *tls.Conn
 	lastIncoming *incomingPackage
 	incoming     *incomingPackage
@@ -49,7 +73,39 @@ type core struct {
 	heap         *heap
 }
 
-func (c *core) in(incoming *incomingPackage) bool {
+func (c *core) process() {
+	for !c.isDrop {
+		select {
+		case i := <-c.in:
+			if !c.inF(i) && c.next != nil {
+				c.next.in <- i
+			}
+		case d := <-c.nextDrop:
+			c.next = d.next
+			if c.next != nil {
+				c.next.drop = c.nextDrop
+				select {
+				case c.next.reset <- nil:
+				default:
+				}
+			}
+		}
+	}
+
+	for {
+		select {
+		case i := <-c.in:
+			if c.next != nil {
+				c.next.in <- i
+			}
+		case <-c.reset:
+		case c.drop <- c:
+			return
+		}
+	}
+}
+
+func (c *core) inF(incoming *incomingPackage) bool {
 	o := c.outgoing
 	for o != nil {
 		if incoming.cid == o.cid {
