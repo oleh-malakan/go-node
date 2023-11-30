@@ -16,7 +16,8 @@ func Dial(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Client, error)
 	}
 
 	client := &Client{
-		tlsConfig: tlsConfig,
+		tlsConfig:     tlsConfig,
+		nodeAddresses: nodeAddresses,
 	}
 
 	go client.process()
@@ -25,10 +26,8 @@ func Dial(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Client, error)
 }
 
 type Client struct {
-	tlsConfig *tls.Config
-	newConn   chan *net.UDPAddr
-	next      *core
-	nextDrop  chan *core
+	tlsConfig     *tls.Config
+	nodeAddresses []*net.UDPAddr
 }
 
 func (c *Client) Connect(nodeID string) (*Connection, error) {
@@ -36,42 +35,31 @@ func (c *Client) Connect(nodeID string) (*Connection, error) {
 }
 
 func (c *Client) process() {
-	for {
-		select {
-		case addr := <-c.newConn:
-			conn, err := net.DialUDP("udp", nil, addr)
-			if err != nil {
-				continue
-			}
-			core := &core{
-				heap: &heap{
-					cap: 512,
-				},
-				in:       make(chan *incomingPackage),
-				nextDrop: make(chan *core),
-				reset:    make(chan *struct{}),
-			}
-			core.conn = tls.Server(core, c.tlsConfig)
-			core.next = c.next
-			c.next = core
-			go core.process()
+	conn, err := net.DialUDP("udp", nil, c.nodeAddresses[0])
+	if err != nil {
 
-			reader := &reader{
-				conn: conn,
-				core: core,
-			}
-			core.reader = reader
-			go reader.process()
-
-		case d := <-c.nextDrop:
-			c.next = d.next
-			if c.next != nil {
-				c.next.drop = c.nextDrop
-				select {
-				case c.next.reset <- nil:
-				default:
-				}
-			}
-		}
 	}
+
+	container := &container{
+		conn:     conn,
+		inData:   make(chan *incomingDatagram),
+		nextDrop: make(chan *core),
+		in:       c.in,
+		next: &core{
+			heap: &heap{
+				cap: 512,
+			},
+			inData:   make(chan *incomingDatagram),
+			nextDrop: make(chan *core),
+			reset:    make(chan *struct{}),
+		},
+	}
+	container.next.conn = tls.Server(container.next, c.tlsConfig)
+	go container.next.process()
+	container.process()
+}
+
+func (client *Client) in(c *container, ip *incomingDatagram) {
+	ip.cid = bToID(ip.b[4:7])
+	c.next.inData <- ip
 }

@@ -21,64 +21,88 @@ func (c *Connection) Close() error {
 	return nil
 }
 
-type incomingPackage struct {
+type incomingDatagram struct {
 	b       []byte
 	n       int
 	offset  int
 	rAddr   *net.UDPAddr
-	next    *incomingPackage
+	next    *incomingDatagram
 	err     error
 	cid     uint32
 	pid     uint32
 	prevPid uint32
 }
 
-type outgoingPackage struct {
+type outgoingDatagram struct {
 	b    []byte
 	n    int
-	prev *outgoingPackage
+	prev *outgoingDatagram
 	pKey [28]byte
 	cid  uint32
 }
 
-type reader struct {
+type container struct {
 	conn *net.UDPConn
-	core *core
+	in   func(*container, *incomingDatagram)
+
+	next     *core
+	inData   chan *incomingDatagram
+	nextDrop chan *core
 }
 
-func (r *reader) process() {
-	for {
-		i := &incomingPackage{
-			b: make([]byte, 1460),
-		}
-		i.n, i.rAddr, i.err = r.conn.ReadFromUDP(i.b)
+func (c *container) process() {
+	go func() {
+		for {
+			i := &incomingDatagram{
+				b: make([]byte, 1460),
+			}
+			i.n, i.rAddr, i.err = c.conn.ReadFromUDP(i.b)
+			if i.err != nil {
 
-		r.core.in <- i
+				//continue
+			}
+			c.inData <- i
+		}
+	}()
+
+	for {
+		select {
+		case i := <-c.inData:
+			c.in(c, i)
+		case d := <-c.nextDrop:
+			c.next = d.next
+			if c.next != nil {
+				c.next.drop = c.nextDrop
+				select {
+				case c.next.reset <- nil:
+				default:
+				}
+			}
+		}
 	}
 }
 
 type core struct {
-	reader   *reader
 	next     *core
-	in       chan *incomingPackage
+	inData   chan *incomingDatagram
 	nextDrop chan *core
 	drop     chan *core
 	reset    chan *struct{}
 	isDrop   bool
 
 	conn         *tls.Conn
-	lastIncoming *incomingPackage
-	incoming     *incomingPackage
-	outgoing     *outgoingPackage
+	lastIncoming *incomingDatagram
+	incoming     *incomingDatagram
+	outgoing     *outgoingDatagram
 	heap         *heap
 }
 
 func (c *core) process() {
 	for !c.isDrop {
 		select {
-		case i := <-c.in:
-			if !c.inF(i) && c.next != nil {
-				c.next.in <- i
+		case i := <-c.inData:
+			if !c.in(i) && c.next != nil {
+				c.next.inData <- i
 			}
 		case d := <-c.nextDrop:
 			c.next = d.next
@@ -94,9 +118,9 @@ func (c *core) process() {
 
 	for {
 		select {
-		case i := <-c.in:
+		case i := <-c.inData:
 			if c.next != nil {
-				c.next.in <- i
+				c.next.inData <- i
 			}
 		case <-c.reset:
 		case c.drop <- c:
@@ -105,7 +129,7 @@ func (c *core) process() {
 	}
 }
 
-func (c *core) inF(incoming *incomingPackage) bool {
+func (c *core) in(incoming *incomingDatagram) bool {
 	o := c.outgoing
 	for o != nil {
 		if incoming.cid == o.cid {
@@ -171,7 +195,7 @@ func (c *core) SetWriteDeadline(t time.Time) error {
 }
 
 type heapItem struct {
-	incoming *incomingPackage
+	incoming *incomingDatagram
 	next     *heapItem
 	prev     *heapItem
 }
@@ -183,7 +207,7 @@ type heap struct {
 	cap  int
 }
 
-func (h *heap) put(incoming *incomingPackage) {
+func (h *heap) put(incoming *incomingDatagram) {
 	cur := h.heap
 	for cur != nil {
 		if cur.incoming.pid == incoming.pid {
@@ -217,7 +241,7 @@ func (h *heap) put(incoming *incomingPackage) {
 	h.len++
 }
 
-func (h *heap) find(pid uint32) *incomingPackage {
+func (h *heap) find(pid uint32) *incomingDatagram {
 	cur := h.heap
 	for cur != nil {
 		if pid == cur.incoming.prevPid {

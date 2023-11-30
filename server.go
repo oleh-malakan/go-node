@@ -29,8 +29,6 @@ func New(config Config, tlsConfig *tls.Config, address *net.UDPAddr, nodeAddress
 		tlsConfig:     tlsConfig,
 		address:       address,
 		nodeAddresses: nodeAddresses,
-		in:            make(chan *incomingPackage),
-		nextDrop:      make(chan *core),
 	}, nil
 }
 
@@ -39,10 +37,6 @@ type Server struct {
 	tlsConfig     *tls.Config
 	address       *net.UDPAddr
 	nodeAddresses []*net.UDPAddr
-
-	next     *core
-	in       chan *incomingPackage
-	nextDrop chan *core
 }
 
 func (s *Server) Handler(nodeID string, f func(connection *Connection)) (*Handler, error) {
@@ -64,53 +58,38 @@ func (s *Server) Run() error {
 		return err
 	}
 
-	go s.process()
-
-	for {
-		i := &incomingPackage{
-			b: make([]byte, 1460),
-		}
-		i.n, i.rAddr, i.err = conn.ReadFromUDP(i.b)
-
-		s.in <- i
+	container := &container{
+		conn:     conn,
+		inData:   make(chan *incomingDatagram),
+		nextDrop: make(chan *core),
+		in:       s.in,
 	}
+	container.process()
+
+	return nil
 }
 
-func (s *Server) process() {
-	for {
-		select {
-		case i := <-s.in:
-			switch {
-			case i.b[0]>>7&1 == 0:
-				core := &core{
-					heap: &heap{
-						cap: s.config.HeapCap,
-					},
-					in:       make(chan *incomingPackage),
-					nextDrop: make(chan *core),
-					reset:    make(chan *struct{}),
-				}
-				core.conn = tls.Server(core, s.tlsConfig)
-				core.incoming = i
-				core.lastIncoming = i
-				core.next = s.next
-				s.next = core
-				go core.process()
-			case i.b[0]>>7&1 == 1:
-				i.cid = bToID(i.b[4:7])
-				if s.next != nil {
-					s.next.in <- i
-				}
-			}
-		case d := <-s.nextDrop:
-			s.next = d.next
-			if s.next != nil {
-				s.next.drop = s.nextDrop
-				select {
-				case s.next.reset <- nil:
-				default:
-				}
-			}
+func (s *Server) in(c *container, ip *incomingDatagram) {
+	switch {
+	case ip.b[0]>>7&1 == 0:
+		core := &core{
+			heap: &heap{
+				cap: s.config.HeapCap,
+			},
+			inData:   make(chan *incomingDatagram),
+			nextDrop: make(chan *core),
+			reset:    make(chan *struct{}),
+		}
+		core.conn = tls.Server(core, s.tlsConfig)
+		core.incoming = ip
+		core.lastIncoming = ip
+		core.next = c.next
+		c.next = core
+		go core.process()
+	case ip.b[0]>>7&1 == 1:
+		ip.cid = bToID(ip.b[4:7])
+		if c.next != nil {
+			c.next.inData <- ip
 		}
 	}
 }
