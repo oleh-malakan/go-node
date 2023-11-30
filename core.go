@@ -194,6 +194,10 @@ func (c *core) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
+const (
+	heapCap = 256
+)
+
 type heapItem struct {
 	incoming *incomingDatagram
 	next     *heapItem
@@ -204,7 +208,6 @@ type heap struct {
 	heap *heapItem
 	last *heapItem
 	len  int
-	cap  int
 }
 
 func (h *heap) put(incoming *incomingDatagram) {
@@ -217,7 +220,7 @@ func (h *heap) put(incoming *incomingDatagram) {
 		cur = cur.next
 	}
 
-	if h.cap <= h.len {
+	if heapCap <= h.len {
 		if h.heap != nil {
 			h.heap = h.heap.next
 			if h.heap == nil {

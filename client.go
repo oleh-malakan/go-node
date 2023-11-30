@@ -46,9 +46,7 @@ func (c *Client) process() {
 		nextDrop: make(chan *core),
 		in:       c.in,
 		next: &core{
-			heap: &heap{
-				cap: 512,
-			},
+			heap:     &heap{},
 			inData:   make(chan *incomingDatagram),
 			nextDrop: make(chan *core),
 			reset:    make(chan *struct{}),

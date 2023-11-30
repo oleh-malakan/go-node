@@ -7,25 +7,12 @@ import (
 	"net"
 )
 
-type Config struct {
-	ClientsLimit int // default value 524288 if 0
-	HeapCap      int // default value 512    if 0
-}
-
-func New(config Config, tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
+func New(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
 	if tlsConfig == nil {
 		return nil, errors.New("require tls config")
 	}
 
-	if config.ClientsLimit <= 0 {
-		config.ClientsLimit = 524288
-	}
-	if config.HeapCap <= 0 {
-		config.HeapCap = 512
-	}
-
 	return &Server{
-		config:        &config,
 		tlsConfig:     tlsConfig,
 		address:       address,
 		nodeAddresses: nodeAddresses,
@@ -33,7 +20,6 @@ func New(config Config, tlsConfig *tls.Config, address *net.UDPAddr, nodeAddress
 }
 
 type Server struct {
-	config        *Config
 	tlsConfig     *tls.Config
 	address       *net.UDPAddr
 	nodeAddresses []*net.UDPAddr
@@ -52,7 +38,12 @@ func (s *Server) Listen(nodeID string) (*Listener, error) {
 	return &Listener{}, nil
 }
 
-func (s *Server) Run() error {
+// clientsLimit default value 524288 if 0
+func (s *Server) Run(clientsLimit int) error {
+	if clientsLimit <= 0 {
+		clientsLimit = 524288
+	}
+
 	conn, err := net.ListenUDP("udp", s.address)
 	if err != nil {
 		return err
@@ -73,9 +64,7 @@ func (s *Server) in(c *container, ip *incomingDatagram) {
 	switch {
 	case ip.b[0]>>7&1 == 0:
 		core := &core{
-			heap: &heap{
-				cap: s.config.HeapCap,
-			},
+			heap:     &heap{},
 			inData:   make(chan *incomingDatagram),
 			nextDrop: make(chan *core),
 			reset:    make(chan *struct{}),
