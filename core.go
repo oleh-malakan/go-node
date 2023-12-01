@@ -33,8 +33,8 @@ const (
 	pdidEnd        = 10
 	didBegin       = 10
 	didEnd         = 13
-	datagramMinCap = 560
-	datagramMaxCap = 1542
+	datagramMinLen = 560
+	datagramCap    = 1542
 	datagramSigCap = 1460
 )
 
