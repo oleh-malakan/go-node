@@ -197,17 +197,17 @@ func (c *core) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
-type Connection struct{}
+type Stream struct{}
 
-func (c *Connection) Send(b []byte) error {
+func (c *Stream) Send(b []byte) error {
 	return nil
 }
 
-func (c *Connection) Receive() ([]byte, error) {
+func (c *Stream) Receive() ([]byte, error) {
 	return nil, nil
 }
 
-func (c *Connection) Close() error {
+func (c *Stream) Close() error {
 	return nil
 }
 

@@ -30,8 +30,8 @@ type Client struct {
 	nodeAddresses []*net.UDPAddr
 }
 
-func (c *Client) Connect(nodeID string) (*Connection, error) {
-	return &Connection{}, nil
+func (c *Client) Stream(nodeID string) (*Stream, error) {
+	return &Stream{}, nil
 }
 
 func (c *Client) process() {

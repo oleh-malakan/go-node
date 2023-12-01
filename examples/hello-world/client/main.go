@@ -15,19 +15,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	connection, err := client.Connect("Hello, World!")
+	stream, err := client.Stream("Hello, World!")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = connection.Send([]byte("Hello"))
+	err = stream.Send([]byte("Hello"))
 	if err != nil {
 		log.Print(err)
 
 		return
 	}
 
-	b, err := connection.Receive()
+	b, err := stream.Receive()
 	if err != nil {
 		log.Print(err)
 
@@ -35,7 +35,7 @@ func main() {
 	}
 	fmt.Println(string(b))
 
-	err = connection.Close()
+	err = stream.Close()
 	if err != nil {
 		log.Print(err)
 

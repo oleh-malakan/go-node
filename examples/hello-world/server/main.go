@@ -14,8 +14,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	_, err = server.Handler("Hello, World!", func(connection *node.Connection) {
-		b, err := connection.Receive()
+	_, err = server.Handler("Hello, World!", func(stream *node.Stream) {
+		b, err := stream.Receive()
 		if err != nil {
 			log.Print(err)
 
@@ -24,7 +24,7 @@ func main() {
 
 		message := string(b)
 		if message == "Hello" {
-			if err := connection.Send([]byte(message + ", World!")); err != nil {
+			if err := stream.Send([]byte(message + ", World!")); err != nil {
 				log.Print(err)
 
 				return

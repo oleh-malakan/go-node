@@ -24,7 +24,7 @@ type Server struct {
 	nodeAddresses []*net.UDPAddr
 }
 
-func (s *Server) Handler(nodeID string, f func(connection *Connection)) (*Handler, error) {
+func (s *Server) Handler(nodeID string, f func(stream *Stream)) (*Handler, error) {
 	h := &Handler{
 		f: f,
 	}
@@ -88,7 +88,7 @@ func (s *Server) Close() error {
 
 type Handler struct {
 	nodeID [sha256.Size224]byte
-	f      func(connection *Connection)
+	f      func(connection *Stream)
 }
 
 func (h *Handler) Close() error {
@@ -97,8 +97,8 @@ func (h *Handler) Close() error {
 
 type Listener struct{}
 
-func (l *Listener) Accept() (*Connection, error) {
-	return &Connection{}, nil
+func (l *Listener) Accept() (*Stream, error) {
+	return &Stream{}, nil
 }
 
 func (l *Listener) Close() error {
