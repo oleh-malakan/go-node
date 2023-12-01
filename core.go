@@ -7,20 +7,6 @@ import (
 	"time"
 )
 
-type Connection struct{}
-
-func (c *Connection) Send(b []byte) error {
-	return nil
-}
-
-func (c *Connection) Receive() ([]byte, error) {
-	return nil, nil
-}
-
-func (c *Connection) Close() error {
-	return nil
-}
-
 const (
 	flags          = 0
 	sigB1          = 1
@@ -208,6 +194,20 @@ func (c *core) SetReadDeadline(t time.Time) error {
 }
 
 func (c *core) SetWriteDeadline(t time.Time) error {
+	return nil
+}
+
+type Connection struct{}
+
+func (c *Connection) Send(b []byte) error {
+	return nil
+}
+
+func (c *Connection) Receive() ([]byte, error) {
+	return nil, nil
+}
+
+func (c *Connection) Close() error {
 	return nil
 }
 
