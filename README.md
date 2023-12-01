@@ -1,7 +1,7 @@
 # go-node
 Cloud Application Platform
 * Transport layer UDP
-* TLS
 * Connection migration
+* TLS
 * Stream multiplexing
 * Cluster
