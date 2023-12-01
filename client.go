@@ -6,7 +6,7 @@ import (
 	"net"
 )
 
-func Dial(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Client, error) {
+func Connect(tlsConfig *tls.Config, nodeAddresses ...*net.UDPAddr) (*Client, error) {
 	if tlsConfig == nil {
 		return nil, errors.New("require tls config")
 	}
