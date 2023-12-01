@@ -28,7 +28,7 @@ func (s *Server) Handler(nodeID string, f func(connection *Connection)) (*Handle
 	h := &Handler{
 		f: f,
 	}
-	h.nodeID = sha256.Sum256([]byte(nodeID))
+	h.nodeID = sha256.Sum224([]byte(nodeID))
 
 	return h, nil
 }
@@ -61,7 +61,7 @@ func (s *Server) Run(clientsLimit int) error {
 
 func (s *Server) in(c *container, ip *incomingDatagram) {
 	switch {
-	case ip.b[0]>>7&1 == 0:
+	case ip.b[flags]>>7&1 == 0:
 		core := &core{
 			heap:     &heap{},
 			inData:   make(chan *incomingDatagram),
@@ -74,8 +74,8 @@ func (s *Server) in(c *container, ip *incomingDatagram) {
 		core.next = c.next
 		c.next = core
 		go core.process()
-	case ip.b[0]>>7&1 == 1:
-		ip.cid = bToID(ip.b[4:7])
+	case ip.b[flags]>>7&1 == 1:
+		ip.cid = bToID(ip.b[cidBegin:cidEnd])
 		if c.next != nil {
 			c.next.inData <- ip
 		}
@@ -87,7 +87,7 @@ func (s *Server) Close() error {
 }
 
 type Handler struct {
-	nodeID [32]byte
+	nodeID [sha256.Size224]byte
 	f      func(connection *Connection)
 }
 

@@ -58,6 +58,6 @@ func (c *Client) process() {
 }
 
 func (client *Client) in(c *container, ip *incomingDatagram) {
-	ip.cid = bToID(ip.b[4:7])
+	ip.cid = bToID(ip.b[cidBegin:cidEnd])
 	c.next.inData <- ip
 }

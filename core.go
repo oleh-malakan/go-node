@@ -21,6 +21,23 @@ func (c *Connection) Close() error {
 	return nil
 }
 
+const (
+	flags          = 0
+	sigB1          = 1
+	sigB2          = 2
+	sigB3          = 3
+	sigSumBegin    = 4
+	cidBegin       = 4
+	cidEnd         = 7
+	pdidBegin      = 7
+	pdidEnd        = 10
+	didBegin       = 10
+	didEnd         = 13
+	datagramMinCap = 560
+	datagramMaxCap = 1542
+	datagramSigCap = 1460
+)
+
 type incomingDatagram struct {
 	b       []byte
 	n       int
@@ -29,15 +46,15 @@ type incomingDatagram struct {
 	next    *incomingDatagram
 	err     error
 	cid     uint32
-	pid     uint32
-	prevPid uint32
+	did     uint32
+	prevDid uint32
 }
 
 type outgoingDatagram struct {
 	b    []byte
 	n    int
 	prev *outgoingDatagram
-	pKey [28]byte
+	pKey [sha256.Size224]byte
 	cid  uint32
 }
 
@@ -54,7 +71,7 @@ func (c *container) process() {
 	go func() {
 		for {
 			i := &incomingDatagram{
-				b: make([]byte, 1460),
+				b: make([]byte, datagramSigCap),
 			}
 			i.n, i.rAddr, i.err = c.conn.ReadFromUDP(i.b)
 			if i.err != nil {
@@ -133,9 +150,9 @@ func (c *core) in(incoming *incomingDatagram) bool {
 	o := c.outgoing
 	for o != nil {
 		if incoming.cid == o.cid {
-			copy(incoming.b[1432:], o.pKey[:])
-			sig := sha256.Sum224(incoming.b[4:])
-			if incoming.b[1] == sig[1] && incoming.b[2] == sig[2] && incoming.b[3] == sig[3] {
+			copy(incoming.b[incoming.n:sha256.Size224], o.pKey[:])
+			sig := sha256.Sum224(incoming.b[sigSumBegin : incoming.n+sha256.Size224])
+			if incoming.b[sigB1] == sig[sigB1] && incoming.b[sigB2] == sig[sigB2] && incoming.b[sigB3] == sig[sigB3] {
 				goto CONTINUE
 			}
 		}
@@ -144,14 +161,14 @@ func (c *core) in(incoming *incomingDatagram) bool {
 
 	return false
 CONTINUE:
-	incoming.prevPid = bToID(incoming.b[7:10])
-	incoming.pid = bToID(incoming.b[10:13])
+	incoming.prevDid = bToID(incoming.b[pdidBegin:pdidEnd])
+	incoming.did = bToID(incoming.b[didBegin:didEnd])
 
-	if c.lastIncoming.pid == incoming.prevPid {
+	if c.lastIncoming.did == incoming.prevDid {
 		c.lastIncoming.next = incoming
 		c.lastIncoming = incoming
 
-		for incoming = c.heap.find(incoming.pid); incoming != nil; {
+		for incoming = c.heap.find(incoming.did); incoming != nil; {
 			c.lastIncoming.next = incoming
 			c.lastIncoming = incoming
 		}
@@ -213,7 +230,7 @@ type heap struct {
 func (h *heap) put(incoming *incomingDatagram) {
 	cur := h.heap
 	for cur != nil {
-		if cur.incoming.pid == incoming.pid {
+		if cur.incoming.did == incoming.did {
 			return
 		}
 
@@ -247,7 +264,7 @@ func (h *heap) put(incoming *incomingDatagram) {
 func (h *heap) find(pid uint32) *incomingDatagram {
 	cur := h.heap
 	for cur != nil {
-		if pid == cur.incoming.prevPid {
+		if pid == cur.incoming.prevDid {
 			if cur.prev != nil {
 				cur.prev.next = cur.next
 			} else {
