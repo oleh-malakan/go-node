@@ -12,13 +12,15 @@ const (
 	sigB1          = 1
 	sigB2          = 2
 	sigB3          = 3
-	sigSumBegin    = 4
-	cidBegin       = 4
-	cidEnd         = 7
-	pdidBegin      = 7
-	pdidEnd        = 10
-	didBegin       = 10
-	didEnd         = 13
+	sigB4          = 4
+	sigSumBegin    = 5
+	cidBegin       = 5
+	cidEnd         = 9
+	pdidBegin      = 9
+	pdidEnd        = 13
+	didBegin       = 13
+	didEnd         = 17
+	dataBegin      = 17
 	datagramMinLen = 560
 	datagramCap    = 1542
 	datagramSigCap = 1460
@@ -138,7 +140,8 @@ func (c *core) in(incoming *incomingDatagram) bool {
 		if incoming.cid == o.cid {
 			copy(incoming.b[incoming.n:sha256.Size224], o.pKey[:])
 			sig := sha256.Sum224(incoming.b[sigSumBegin : incoming.n+sha256.Size224])
-			if incoming.b[sigB1] == sig[sigB1] && incoming.b[sigB2] == sig[sigB2] && incoming.b[sigB3] == sig[sigB3] {
+			if incoming.b[sigB1] == sig[sigB1] && incoming.b[sigB2] == sig[sigB2] &&
+				incoming.b[sigB3] == sig[sigB3] && incoming.b[sigB4] == sig[sigB4] {
 				goto CONTINUE
 			}
 		}
