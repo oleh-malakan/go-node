@@ -99,10 +99,11 @@ func (c *core) process() {
 	ctx, cancelHandshake := context.WithCancel(context.Background())
 	go c.conn.HandshakeContext(ctx)
 
-	c.tlsRead = &tlsProcess{
+	c.tlsProcess = &tlsProcess{
 		tlsInData:   make(chan *incomingDatagram),
 		tlsInSignal: make(chan *struct{}),
 	}
+	c.tlsRead = 
 	timerCancelHandshake := time.NewTimer(time.Duration(200) * time.Millisecond)
 	for c.isProcess {
 		select {
