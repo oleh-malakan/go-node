@@ -59,9 +59,9 @@ func (s *Server) Run(clientsLimit int) error {
 	return nil
 }
 
-func (s *Server) in(c *container, ip *incomingDatagram) {
+func (s *Server) in(c *container, incoming *incomingDatagram) {
 	switch {
-	case ip.b[flags]>>7&1 == 0:
+	case incoming.b[0]&0b10000000 == 0:
 		core := &core{
 			heap:     &heap{},
 			inData:   make(chan *incomingDatagram),
@@ -69,15 +69,15 @@ func (s *Server) in(c *container, ip *incomingDatagram) {
 			reset:    make(chan *struct{}),
 		}
 		core.conn = tls.Server(core, s.tlsConfig)
-		core.incoming = ip
-		core.lastIncoming = ip
+		core.incoming = incoming
+		core.lastIncoming = incoming
 		core.next = c.next
 		c.next = core
 		go core.process()
-	case ip.b[flags]>>7&1 == 1:
-		ip.cid = bToCid(ip.b[cidBegin:cidEnd])
+	case incoming.b[0]&0b10000000 == 1:
+		incoming.cid = cidFromB(incoming.b)
 		if c.next != nil {
-			c.next.inData <- ip
+			c.next.inData <- incoming
 		}
 	}
 }

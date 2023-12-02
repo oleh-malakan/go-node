@@ -8,18 +8,7 @@ import (
 )
 
 const (
-	flags          = 0
-	sigB1          = 1
-	sigB2          = 2
-	sigB3          = 3
-	sigB4          = 4
 	sigSumBegin    = 5
-	cidBegin       = 5
-	cidEnd         = 9
-	pdidBegin      = 9
-	pdidEnd        = 12
-	didBegin       = 12
-	didEnd         = 15
 	dataBegin      = 15
 	datagramMinLen = 560
 	datagramCap    = 1542
@@ -140,8 +129,8 @@ func (c *core) in(incoming *incomingDatagram) bool {
 		if incoming.cid == o.cid {
 			copy(incoming.b[incoming.n:sha256.Size224], o.pKey[:])
 			sig := sha256.Sum224(incoming.b[sigSumBegin : incoming.n+sha256.Size224])
-			if incoming.b[sigB1] == sig[sigB1] && incoming.b[sigB2] == sig[sigB2] &&
-				incoming.b[sigB3] == sig[sigB3] && incoming.b[sigB4] == sig[sigB4] {
+			if incoming.b[1] == sig[1] && incoming.b[2] == sig[2] &&
+				incoming.b[3] == sig[3] && incoming.b[4] == sig[4] {
 				goto CONTINUE
 			}
 		}
@@ -150,8 +139,8 @@ func (c *core) in(incoming *incomingDatagram) bool {
 
 	return false
 CONTINUE:
-	incoming.prevDid = bToDid(incoming.b[pdidBegin:pdidEnd])
-	incoming.did = bToDid(incoming.b[didBegin:didEnd])
+	incoming.prevDid = prevDidFromB(incoming.b)
+	incoming.did = didFromB(incoming.b)
 
 	if c.lastIncoming.did == incoming.prevDid {
 		c.lastIncoming.next = incoming
@@ -286,10 +275,15 @@ func (h *heap) find(pid uint32) *incomingDatagram {
 	return nil
 }
 
-func bToCid(b []byte) uint32 {
-	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
+func cidFromB(b []byte) uint32 {
+	return uint32(b[5]) | uint32(b[6])<<8 | uint32(b[7])<<16 | uint32(b[8])<<24
+
 }
 
-func bToDid(b []byte) uint32 {
-	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16
+func prevDidFromB(b []byte) uint32 {
+	return uint32(b[9]) | uint32(b[10])<<8 | uint32(b[11])<<16
+}
+
+func didFromB(b []byte) uint32 {
+	return uint32(b[12]) | uint32(b[13])<<8 | uint32(b[14])<<16
 }

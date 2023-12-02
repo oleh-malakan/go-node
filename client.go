@@ -57,7 +57,7 @@ func (c *Client) process() {
 	container.process()
 }
 
-func (client *Client) in(c *container, ip *incomingDatagram) {
-	ip.cid = bToCid(ip.b[cidBegin:cidEnd])
-	c.next.inData <- ip
+func (client *Client) in(c *container, incoming *incomingDatagram) {
+	incoming.cid = cidFromB(incoming.b)
+	c.next.inData <- incoming
 }
