@@ -91,7 +91,7 @@ type core struct {
 	heap         *heap
 
 	conn       *tls.Conn
-	tlsCore    tlsCore
+	tlsRead    tlsRead
 	tlsProcess *tlsProcess
 }
 
@@ -99,11 +99,10 @@ func (c *core) process() {
 	ctx, cancelHandshake := context.WithCancel(context.Background())
 	go c.conn.HandshakeContext(ctx)
 
-	c.tlsProcess = &tlsProcess{
+	c.tlsRead = &tlsProcess{
 		tlsInData:   make(chan *incomingDatagram),
 		tlsInSignal: make(chan *struct{}),
 	}
-	c.tlsCore = c.tlsProcess
 	timerCancelHandshake := time.NewTimer(time.Duration(200) * time.Millisecond)
 	for c.isProcess {
 		select {
@@ -178,7 +177,7 @@ CONTINUE:
 	return true
 }
 
-type tlsCore interface {
+type tlsRead interface {
 	read(b []byte) (n int, err error)
 }
 
@@ -208,7 +207,7 @@ func (c *core) tslIn() {
 }
 
 func (c *core) Read(b []byte) (n int, err error) {
-	return c.tlsCore.read(b)
+	return c.tlsRead.read(b)
 }
 
 func (c *core) Write(b []byte) (n int, err error) {

@@ -51,7 +51,10 @@ func (c *Client) process() {
 			nextDrop:  make(chan *core),
 			resetDrop: make(chan *struct{}),
 			isProcess: true,
-			tlsCore:   &tlsClientHandshake{},
+			tlsRead: &tlsProcess{
+				tlsInData:   make(chan *incomingDatagram),
+				tlsInSignal: make(chan *struct{}),
+			},
 		},
 	}
 	container.next.conn = tls.Client(container.next, c.tlsConfig)
@@ -62,10 +65,4 @@ func (c *Client) process() {
 func (client *Client) in(c *container, incoming *incomingDatagram) {
 	incoming.cid = cidFromB(incoming.b)
 	c.next.inData <- incoming
-}
-
-type tlsClientHandshake struct{}
-
-func (c *tlsClientHandshake) read(b []byte) (n int, err error) {
-	return 0, nil
 }

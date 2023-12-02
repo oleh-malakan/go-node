@@ -68,7 +68,7 @@ func (s *Server) in(c *container, incoming *incomingDatagram) {
 			nextDrop:  make(chan *core),
 			resetDrop: make(chan *struct{}),
 			isProcess: true,
-			tlsCore:   &tlsServerHandshake{},
+			tlsRead:   &tlsServerHandshake{},
 		}
 		core.conn = tls.Server(core, s.tlsConfig)
 		core.incoming = incoming
