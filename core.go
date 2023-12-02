@@ -9,7 +9,7 @@ import (
 
 const (
 	sigSumBegin    = 5
-	dataBegin      = 15
+	dataBegin      = 17
 	datagramMinLen = 560
 	datagramCap    = 1542
 	datagramSigCap = 1460
@@ -275,24 +275,24 @@ func (h *heap) find(pid uint32) *incomingDatagram {
 	return nil
 }
 
-func cidFromB(b []byte) uint32 {
-	return uint32(b[5]) | uint32(b[6])<<8 | uint32(b[7])<<16 | uint32(b[8])<<24
-
-}
-
-func prevDidFromB(b []byte) uint32 {
-	return uint32(b[9]) | uint32(b[10])<<8 | uint32(b[11])<<16
-}
-
-func didFromB(b []byte) uint32 {
-	return uint32(b[12]) | uint32(b[13])<<8 | uint32(b[14])<<16
-}
-
 // uint20 =    1048575 =   1gb  = 2b.4bit
 // uint22 =    4194303 =   5gb	= 2b.6bit
 // uint23 =    8388607 =  11gb  = 2b.7bit
 // uint24 =   16777215 =  22gb  = 3b
 // uint27 =  134217727 = 177gb  = 3b.3bit
 // uint32 = 4294967295 = 5667gb = 4b
-// 3b + 3b + 2b.7bit + 2b.7bit = 11b.6bit
-// 4b + 4b + 3b.3bit + 3b.3bit = 14b.6bit
+// 3b + 3b + 2b.7bit + 2b.7bit = 11b.6bit // 3op + 3op + 3op+1op + 3op+1op
+// 4b + 4b + 3b.3bit + 3b.3bit = 14b.6bit // 4op + 4op + 4op + 4op
+// 4b + 4b + 4b + 4b           = 16b      // 4op + 4op + 4op + 4op
+
+func cidFromB(b []byte) uint32 {
+	return uint32(b[5]) | uint32(b[6])<<8 | uint32(b[7])<<16 | uint32(b[8])<<24
+}
+
+func prevDidFromB(b []byte) uint32 {
+	return uint32(b[9]) | uint32(b[10])<<8 | uint32(b[11])<<16 | uint32(b[12])<<24
+}
+
+func didFromB(b []byte) uint32 {
+	return uint32(b[13]) | uint32(b[14])<<8 | uint32(b[15])<<16 | uint32(b[16])<<24
+}
