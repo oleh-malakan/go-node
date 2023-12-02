@@ -66,13 +66,15 @@ func (s *Server) in(c *container, incoming *incomingDatagram) {
 			heap:      &heap{},
 			inData:    make(chan *incomingDatagram),
 			nextDrop:  make(chan *core),
-			resetDrop: make(chan *struct{}),
+			signal:    make(chan *struct{}),
 			isProcess: true,
-			tlsRead:   &tlsServerHandshake{},
 		}
 		core.conn = tls.Server(core, s.tlsConfig)
 		core.incoming = incoming
 		core.lastIncoming = incoming
+		core.tlsRead = &tlsServerHandshake{
+			signal: core.signal,
+		}
 		core.next = c.next
 		c.next = core
 		go core.process()
@@ -84,9 +86,13 @@ func (s *Server) in(c *container, incoming *incomingDatagram) {
 	}
 }
 
-type tlsServerHandshake struct{}
+type tlsServerHandshake struct {
+	signal chan *struct{}
+}
 
 func (c *tlsServerHandshake) read(b []byte) (n int, err error) {
+	c.signal <- nil
+	<-c.signal
 	return 0, nil
 }
 

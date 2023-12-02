@@ -69,7 +69,7 @@ func (c *container) process() {
 			if c.next != nil {
 				c.next.drop = c.nextDrop
 				select {
-				case c.next.resetDrop <- nil:
+				case c.next.signal <- nil:
 				default:
 				}
 			}
@@ -82,7 +82,7 @@ type core struct {
 	next      *core
 	nextDrop  chan *core
 	drop      chan *core
-	resetDrop chan *struct{}
+	signal    chan *struct{}
 
 	inData       chan *incomingDatagram
 	lastIncoming *incomingDatagram
@@ -103,7 +103,9 @@ func (c *core) process() {
 		tlsInData:   make(chan *incomingDatagram),
 		tlsInSignal: make(chan *struct{}),
 	}
-	c.tlsRead = 
+	<-c.signal
+	c.tlsRead = c.tlsProcess
+	c.signal <- nil
 	timerCancelHandshake := time.NewTimer(time.Duration(200) * time.Millisecond)
 	for c.isProcess {
 		select {
@@ -121,7 +123,7 @@ func (c *core) process() {
 			if c.next != nil {
 				c.next.drop = c.nextDrop
 				select {
-				case c.next.resetDrop <- nil:
+				case c.next.signal <- nil:
 				default:
 				}
 			}
@@ -137,7 +139,7 @@ func (c *core) process() {
 			if c.next != nil {
 				c.next.inData <- i
 			}
-		case <-c.resetDrop:
+		case <-c.signal:
 		case c.drop <- c:
 			return
 		}

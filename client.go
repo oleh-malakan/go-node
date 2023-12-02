@@ -49,7 +49,7 @@ func (c *Client) process() {
 			heap:      &heap{},
 			inData:    make(chan *incomingDatagram),
 			nextDrop:  make(chan *core),
-			resetDrop: make(chan *struct{}),
+			signal:    make(chan *struct{}),
 			isProcess: true,
 			tlsRead: &tlsProcess{
 				tlsInData:   make(chan *incomingDatagram),
