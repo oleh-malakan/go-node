@@ -17,10 +17,10 @@ const (
 	cidBegin       = 5
 	cidEnd         = 9
 	pdidBegin      = 9
-	pdidEnd        = 13
-	didBegin       = 13
-	didEnd         = 17
-	dataBegin      = 17
+	pdidEnd        = 12
+	didBegin       = 12
+	didEnd         = 15
+	dataBegin      = 15
 	datagramMinLen = 560
 	datagramCap    = 1542
 	datagramSigCap = 1460
@@ -150,8 +150,8 @@ func (c *core) in(incoming *incomingDatagram) bool {
 
 	return false
 CONTINUE:
-	incoming.prevDid = bToID(incoming.b[pdidBegin:pdidEnd])
-	incoming.did = bToID(incoming.b[didBegin:didEnd])
+	incoming.prevDid = bToDid(incoming.b[pdidBegin:pdidEnd])
+	incoming.did = bToDid(incoming.b[didBegin:didEnd])
 
 	if c.lastIncoming.did == incoming.prevDid {
 		c.lastIncoming.next = incoming
@@ -286,6 +286,10 @@ func (h *heap) find(pid uint32) *incomingDatagram {
 	return nil
 }
 
-func bToID(b []byte) uint32 {
+func bToCid(b []byte) uint32 {
 	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
+}
+
+func bToDid(b []byte) uint32 {
+	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16
 }

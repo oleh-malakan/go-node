@@ -75,7 +75,7 @@ func (s *Server) in(c *container, ip *incomingDatagram) {
 		c.next = core
 		go core.process()
 	case ip.b[flags]>>7&1 == 1:
-		ip.cid = bToID(ip.b[cidBegin:cidEnd])
+		ip.cid = bToCid(ip.b[cidBegin:cidEnd])
 		if c.next != nil {
 			c.next.inData <- ip
 		}
