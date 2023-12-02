@@ -287,3 +287,12 @@ func prevDidFromB(b []byte) uint32 {
 func didFromB(b []byte) uint32 {
 	return uint32(b[12]) | uint32(b[13])<<8 | uint32(b[14])<<16
 }
+
+// uint20 =    1048575 =   1gb  = 2b.4bit
+// uint22 =    4194303 =   5gb	= 2b.6bit
+// uint23 =    8388607 =  11gb  = 2b.7bit
+// uint24 =   16777215 =  22gb  = 3b
+// uint27 =  134217727 = 177gb  = 3b.3bit
+// uint32 = 4294967295 = 5667gb = 4b
+// 3b + 3b + 2b.7bit + 2b.7bit = 11b.6bit
+// 4b + 4b + 3b.3bit + 3b.3bit = 14b.6bit
