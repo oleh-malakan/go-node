@@ -68,7 +68,7 @@ func (c *container) process() {
 			if c.next != nil {
 				c.next.drop = c.nextDrop
 				select {
-				case c.next.reset <- nil:
+				case c.next.resetDrop <- nil:
 				default:
 				}
 			}
@@ -77,33 +77,43 @@ func (c *container) process() {
 }
 
 type core struct {
-	next     *core
-	inData   chan *incomingDatagram
-	nextDrop chan *core
-	drop     chan *core
-	reset    chan *struct{}
-	isDrop   bool
+	isProcess bool
+	next      *core
+	nextDrop  chan *core
+	drop      chan *core
+	resetDrop chan *struct{}
 
-	conn         *tls.Conn
+	inData       chan *incomingDatagram
 	lastIncoming *incomingDatagram
 	incoming     *incomingDatagram
 	outgoing     *outgoingDatagram
 	heap         *heap
+
+	conn        *tls.Conn
+	tlsInData   chan *incomingDatagram
+	tlsInSignal chan *struct{}
 }
 
 func (c *core) process() {
-	for !c.isDrop {
+	go c.tlsProcess()
+
+	for c.isProcess {
 		select {
 		case i := <-c.inData:
 			if !c.in(i) && c.next != nil {
 				c.next.inData <- i
+
+				continue
 			}
+			c.tslIn()
+		case <-c.tlsInSignal:
+			c.tslIn()
 		case d := <-c.nextDrop:
 			c.next = d.next
 			if c.next != nil {
 				c.next.drop = c.nextDrop
 				select {
-				case c.next.reset <- nil:
+				case c.next.resetDrop <- nil:
 				default:
 				}
 			}
@@ -116,9 +126,23 @@ func (c *core) process() {
 			if c.next != nil {
 				c.next.inData <- i
 			}
-		case <-c.reset:
+		case <-c.resetDrop:
 		case c.drop <- c:
 			return
+		}
+	}
+}
+
+func (c *core) tlsProcess() {
+	for c.isProcess {
+		select {
+		case cur := <-c.tlsInData:
+			for cur.next != nil {
+				//
+				cur = cur.next
+			}
+
+			c.tlsInSignal <- nil
 		}
 	}
 }
@@ -155,6 +179,14 @@ CONTINUE:
 	}
 
 	return true
+}
+
+func (c *core) tslIn() {
+	select {
+	case c.tlsInData <- c.next.incoming:
+		c.next.incoming = c.lastIncoming
+	default:
+	}
 }
 
 func (c *core) Read(b []byte) (n int, err error) {

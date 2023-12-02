@@ -46,10 +46,11 @@ func (c *Client) process() {
 		nextDrop: make(chan *core),
 		in:       c.in,
 		next: &core{
-			heap:     &heap{},
-			inData:   make(chan *incomingDatagram),
-			nextDrop: make(chan *core),
-			reset:    make(chan *struct{}),
+			heap:      &heap{},
+			inData:    make(chan *incomingDatagram),
+			nextDrop:  make(chan *core),
+			resetDrop: make(chan *struct{}),
+			isProcess: true,
 		},
 	}
 	container.next.conn = tls.Server(container.next, c.tlsConfig)

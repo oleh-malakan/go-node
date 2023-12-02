@@ -63,10 +63,11 @@ func (s *Server) in(c *container, incoming *incomingDatagram) {
 	switch {
 	case incoming.b[0]&0b10000000 == 0:
 		core := &core{
-			heap:     &heap{},
-			inData:   make(chan *incomingDatagram),
-			nextDrop: make(chan *core),
-			reset:    make(chan *struct{}),
+			heap:      &heap{},
+			inData:    make(chan *incomingDatagram),
+			nextDrop:  make(chan *core),
+			resetDrop: make(chan *struct{}),
+			isProcess: true,
 		}
 		core.conn = tls.Server(core, s.tlsConfig)
 		core.incoming = incoming
