@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"net"
@@ -95,38 +96,41 @@ type core struct {
 }
 
 func (c *core) process() {
-	if err := c.conn.Handshake(); err == nil {
-		c.tlsProcess = &tlsProcess{
-			tlsInData:   make(chan *incomingDatagram),
-			tlsInSignal: make(chan *struct{}),
-		}
-		c.tlsCore = c.tlsProcess
-		for c.isProcess {
-			select {
-			case i := <-c.inData:
-				if !c.in(i) && c.next != nil {
-					c.next.inData <- i
+	ctx, cancelHandshake := context.WithCancel(context.Background())
+	go c.conn.HandshakeContext(ctx)
 
-					continue
-				}
-				c.tslIn()
-			case <-c.tlsProcess.tlsInSignal:
-				c.tslIn()
-			case d := <-c.nextDrop:
-				c.next = d.next
-				if c.next != nil {
-					c.next.drop = c.nextDrop
-					select {
-					case c.next.resetDrop <- nil:
-					default:
-					}
+	c.tlsProcess = &tlsProcess{
+		tlsInData:   make(chan *incomingDatagram),
+		tlsInSignal: make(chan *struct{}),
+	}
+	c.tlsCore = c.tlsProcess
+	timerCancelHandshake := time.NewTimer(time.Duration(200) * time.Millisecond)
+	for c.isProcess {
+		select {
+		case i := <-c.inData:
+			if !c.in(i) && c.next != nil {
+				c.next.inData <- i
+
+				continue
+			}
+			c.tslIn()
+		case <-c.tlsProcess.tlsInSignal:
+			c.tslIn()
+		case d := <-c.nextDrop:
+			c.next = d.next
+			if c.next != nil {
+				c.next.drop = c.nextDrop
+				select {
+				case c.next.resetDrop <- nil:
+				default:
 				}
 			}
+		case <-timerCancelHandshake.C:
+			c.isProcess = false
 		}
-	} else {
-		c.isProcess = false
 	}
 
+	cancelHandshake()
 	for {
 		select {
 		case i := <-c.inData:
