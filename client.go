@@ -53,7 +53,7 @@ func (c *Client) process() {
 			isProcess: true,
 		},
 	}
-	container.next.conn = tls.Server(container.next, c.tlsConfig)
+	container.next.conn = tls.Client(container.next, c.tlsConfig)
 	go container.next.process()
 	container.process()
 }

@@ -89,14 +89,12 @@ type core struct {
 	outgoing     *outgoingDatagram
 	heap         *heap
 
-	conn        *tls.Conn
-	tlsInData   chan *incomingDatagram
-	tlsInSignal chan *struct{}
+	conn       *tls.Conn
+	tlsCore    tlsCore
+	tlsProcess *tlsProcess
 }
 
 func (c *core) process() {
-	go c.tlsProcess()
-
 	for c.isProcess {
 		select {
 		case i := <-c.inData:
@@ -106,7 +104,7 @@ func (c *core) process() {
 				continue
 			}
 			c.tslIn()
-		case <-c.tlsInSignal:
+		case <-c.tlsProcess.tlsInSignal:
 			c.tslIn()
 		case d := <-c.nextDrop:
 			c.next = d.next
@@ -129,20 +127,6 @@ func (c *core) process() {
 		case <-c.resetDrop:
 		case c.drop <- c:
 			return
-		}
-	}
-}
-
-func (c *core) tlsProcess() {
-	for c.isProcess {
-		select {
-		case cur := <-c.tlsInData:
-			for cur.next != nil {
-				//
-				cur = cur.next
-			}
-
-			c.tlsInSignal <- nil
 		}
 	}
 }
@@ -181,16 +165,43 @@ CONTINUE:
 	return true
 }
 
+type tlsCore interface {
+	read(b []byte) (n int, err error)
+}
+
+type tlsHandshake struct{}
+
+func (c *tlsHandshake) read(b []byte) (n int, err error) {
+	return 0, nil
+}
+
+type tlsProcess struct {
+	tlsInData   chan *incomingDatagram
+	tlsInSignal chan *struct{}
+}
+
+func (c *tlsProcess) read(b []byte) (n int, err error) {
+	cur := <-c.tlsInData
+	for cur.next != nil {
+		//
+		cur = cur.next
+	}
+
+	c.tlsInSignal <- nil
+
+	return 0, nil
+}
+
 func (c *core) tslIn() {
 	select {
-	case c.tlsInData <- c.next.incoming:
-		c.next.incoming = c.lastIncoming
+	case c.tlsProcess.tlsInData <- c.incoming:
+		c.incoming = c.lastIncoming
 	default:
 	}
 }
 
 func (c *core) Read(b []byte) (n int, err error) {
-	return
+	return c.tlsCore.read(b)
 }
 
 func (c *core) Write(b []byte) (n int, err error) {
