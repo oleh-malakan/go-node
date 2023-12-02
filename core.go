@@ -95,8 +95,6 @@ type core struct {
 }
 
 func (c *core) process() {
-	tlsHandshake := &tlsHandshake{}
-	c.tlsCore = tlsHandshake
 	if err := c.conn.Handshake(); err == nil {
 		c.tlsProcess = &tlsProcess{
 			tlsInData:   make(chan *incomingDatagram),
@@ -178,12 +176,6 @@ CONTINUE:
 
 type tlsCore interface {
 	read(b []byte) (n int, err error)
-}
-
-type tlsHandshake struct{}
-
-func (c *tlsHandshake) read(b []byte) (n int, err error) {
-	return 0, nil
 }
 
 type tlsProcess struct {
