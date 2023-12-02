@@ -95,27 +95,38 @@ type core struct {
 }
 
 func (c *core) process() {
-	for c.isProcess {
-		select {
-		case i := <-c.inData:
-			if !c.in(i) && c.next != nil {
-				c.next.inData <- i
+	tlsHandshake := &tlsHandshake{}
+	c.tlsCore = tlsHandshake
+	if err := c.conn.Handshake(); err == nil {
+		c.tlsProcess = &tlsProcess{
+			tlsInData:   make(chan *incomingDatagram),
+			tlsInSignal: make(chan *struct{}),
+		}
+		c.tlsCore = c.tlsProcess
+		for c.isProcess {
+			select {
+			case i := <-c.inData:
+				if !c.in(i) && c.next != nil {
+					c.next.inData <- i
 
-				continue
-			}
-			c.tslIn()
-		case <-c.tlsProcess.tlsInSignal:
-			c.tslIn()
-		case d := <-c.nextDrop:
-			c.next = d.next
-			if c.next != nil {
-				c.next.drop = c.nextDrop
-				select {
-				case c.next.resetDrop <- nil:
-				default:
+					continue
+				}
+				c.tslIn()
+			case <-c.tlsProcess.tlsInSignal:
+				c.tslIn()
+			case d := <-c.nextDrop:
+				c.next = d.next
+				if c.next != nil {
+					c.next.drop = c.nextDrop
+					select {
+					case c.next.resetDrop <- nil:
+					default:
+					}
 				}
 			}
 		}
+	} else {
+		c.isProcess = false
 	}
 
 	for {
