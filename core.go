@@ -220,9 +220,9 @@ func (c *tlsProcess) read(b []byte) (n int, err error) {
 
 func (c *core) tslIn() {
 	if c.incomingAnchor != c.lastIncoming {
-		c.incomingAnchor = c.lastIncoming
 		select {
-		case c.tlsProcess.inAnchor <- c.incomingAnchor:
+		case c.tlsProcess.inAnchor <- c.lastIncoming:
+			c.incomingAnchor = c.lastIncoming
 		default:
 		}
 	}
