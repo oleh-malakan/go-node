@@ -52,8 +52,8 @@ func (c *Client) process() {
 			signal:    make(chan *struct{}),
 			isProcess: true,
 			tlsRead: &tlsProcess{
-				tlsInData:   make(chan *incomingDatagram),
-				tlsInSignal: make(chan *struct{}),
+				inAnchor: make(chan *incomingDatagram),
+				inSignal: make(chan *struct{}),
 			},
 		},
 	}

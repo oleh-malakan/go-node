@@ -1,7 +1,6 @@
 package node
 
 import (
-	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"net"
@@ -91,11 +90,12 @@ type core struct {
 	drop      chan *core
 	signal    chan *struct{}
 
-	inData       chan *incomingDatagram
-	lastIncoming *incomingDatagram
-	incoming     *incomingDatagram
-	outgoing     *outgoingDatagram
-	heap         *heap
+	inData         chan *incomingDatagram
+	lastIncoming   *incomingDatagram
+	incoming       *incomingDatagram
+	incomingAnchor *incomingDatagram
+	outgoing       *outgoingDatagram
+	heap           *heap
 
 	conn       *tls.Conn
 	tlsRead    tlsRead
@@ -103,16 +103,25 @@ type core struct {
 }
 
 func (c *core) process() {
-	ctx, cancelHandshake := context.WithCancel(context.Background())
-	go c.conn.HandshakeContext(ctx)
-
-	c.tlsProcess = &tlsProcess{
-		tlsInData:   make(chan *incomingDatagram),
-		tlsInSignal: make(chan *struct{}),
+LOOP:
+	for c.isProcess {
+		select {
+		case i := <-c.inData:
+			if c.next != nil {
+				c.next.inData <- i
+			}
+		case <-c.signal:
+			c.tlsProcess = &tlsProcess{
+				core:     c,
+				inAnchor: make(chan *incomingDatagram),
+				inSignal: make(chan *struct{}),
+			}
+			c.tlsRead = c.tlsProcess
+			c.signal <- nil
+			break LOOP
+		}
 	}
-	<-c.signal
-	c.tlsRead = c.tlsProcess
-	c.signal <- nil
+
 	timerCancelHandshake := time.NewTimer(time.Duration(200) * time.Millisecond)
 	for c.isProcess {
 		select {
@@ -123,7 +132,7 @@ func (c *core) process() {
 				continue
 			}
 			c.tslIn()
-		case <-c.tlsProcess.tlsInSignal:
+		case <-c.tlsProcess.inSignal:
 			c.tslIn()
 		case d := <-c.nextDrop:
 			c.next = d.next
@@ -135,11 +144,12 @@ func (c *core) process() {
 				}
 			}
 		case <-timerCancelHandshake.C:
-			c.isProcess = false
+			if !c.conn.ConnectionState().HandshakeComplete {
+				c.isProcess = false
+			}
 		}
 	}
 
-	cancelHandshake()
 	for {
 		select {
 		case i := <-c.inData:
@@ -189,27 +199,32 @@ type tlsRead interface {
 }
 
 type tlsProcess struct {
-	tlsInData   chan *incomingDatagram
-	tlsInSignal chan *struct{}
+	core     *core
+	inAnchor chan *incomingDatagram
+	inSignal chan *struct{}
 }
 
 func (c *tlsProcess) read(b []byte) (n int, err error) {
-	cur := <-c.tlsInData
-	for cur.next != nil {
+	anchor := <-c.inAnchor
+	cur := c.core.incoming
+	for cur != anchor {
 		//
 		cur = cur.next
 	}
+	c.core.incoming = anchor
 
-	c.tlsInSignal <- nil
+	c.inSignal <- nil
 
 	return 0, nil
 }
 
 func (c *core) tslIn() {
-	select {
-	case c.tlsProcess.tlsInData <- c.incoming:
-		c.incoming = c.lastIncoming
-	default:
+	if c.incomingAnchor != c.lastIncoming {
+		c.incomingAnchor = c.lastIncoming
+		select {
+		case c.tlsProcess.inAnchor <- c.incomingAnchor:
+		default:
+		}
 	}
 }
 
