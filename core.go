@@ -16,7 +16,7 @@ const (
 )
 
 type incomingDatagram struct {
-	b       [datagramSigLen]byte
+	b       []byte
 	n       int
 	dataEnd int
 	offset  int
@@ -28,7 +28,7 @@ type incomingDatagram struct {
 	prevDid uint32
 }
 
-func (d *incomingDatagram) checkSig(key [sha256.Size224]byte) bool {
+func (d *incomingDatagram) checkSig(key []byte) bool {
 	sig := signing(d.b, d.dataEnd, key)
 	return d.b[0] == sig[0] && d.b[1] == sig[1] && d.b[2] == sig[2] && d.b[3] == sig[3]
 }
@@ -38,7 +38,7 @@ type outgoingDatagram struct {
 	n       int
 	dataEnd int
 	prev    *outgoingDatagram
-	key     [sha256.Size224]byte
+	key     []byte
 	cid     uint32
 }
 
@@ -54,8 +54,10 @@ type container struct {
 func (c *container) process() {
 	go func() {
 		for {
-			i := &incomingDatagram{}
-			i.n, i.rAddr, i.err = c.conn.ReadFromUDP(i.b[:])
+			i := &incomingDatagram{
+				b: make([]byte, datagramSigLen),
+			}
+			i.n, i.rAddr, i.err = c.conn.ReadFromUDP(i.b)
 			if i.err != nil {
 
 				//continue
@@ -339,19 +341,19 @@ func (h *heap) find(pid uint32) *incomingDatagram {
 // 4b + 4b + 3b.3bit + 3b.3bit = 14b.6bit // 4op + 4op + 4op + 4op
 // 4b + 4b + 4b + 4b           = 16b      // 4op + 4op + 4op + 4op
 
-func signing(b [datagramSigLen]byte, n int, key [sha256.Size224]byte) [sha256.Size224]byte {
+func signing(b []byte, n int, key []byte) [sha256.Size224]byte {
 	copy(b[n:sha256.Size224], key[:])
 	return sha256.Sum224(b[4 : n+sha256.Size224])
 }
 
-func cidFromB(b [datagramSigLen]byte) uint32 {
+func cidFromB(b []byte) uint32 {
 	return uint32(b[4]) | uint32(b[5])<<8 | uint32(b[6])<<16 | uint32(b[7])<<24
 }
 
-func prevDidFromB(b [datagramSigLen]byte) uint32 {
+func prevDidFromB(b []byte) uint32 {
 	return uint32(b[8]) | uint32(b[9])<<8 | uint32(b[10])<<16 | uint32(b[11])<<24
 }
 
-func didFromB(b [datagramSigLen]byte) uint32 {
+func didFromB(b []byte) uint32 {
 	return uint32(b[12]) | uint32(b[13])<<8 | uint32(b[14])<<16 | uint32(b[15])<<24
 }
