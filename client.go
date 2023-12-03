@@ -63,6 +63,7 @@ func (c *Client) process() {
 }
 
 func (client *Client) in(c *container, incoming *incomingDatagram) {
+	incoming.offset = dataBegin
 	incoming.cid = cidFromB(incoming.b)
 	c.next.inData <- incoming
 }

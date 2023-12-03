@@ -8,10 +8,11 @@ import (
 )
 
 const (
-	dataBegin      = 16
-	datagramMinLen = 560
-	datagramMaxLen = 1432
-	datagramSigLen = 1460
+	dataHandshakeBegin = 4
+	dataBegin          = 16
+	datagramMinLen     = 560
+	datagramMaxLen     = 1432
+	datagramSigLen     = 1460
 )
 
 type incomingDatagram struct {
@@ -69,7 +70,6 @@ func (c *container) process() {
 	for {
 		select {
 		case i := <-c.inData:
-			i.offset = dataBegin
 			i.dataEnd = i.n - 1
 			c.in(c, i)
 		case d := <-c.nextDrop:
@@ -218,8 +218,8 @@ func (c *tlsProcess) read(b []byte) (n int, err error) {
 						c.core.incoming.offset = c.core.incoming.offset + len(b) - offset
 						return len(b), nil
 					} else {
-						copy(b[offset:c.core.incoming.dataEnd-c.core.incoming.offset], c.core.incoming.b[:])// i know
-						offset = offset + c.core.incoming.dataEnd-c.core.incoming.offset
+						copy(b[offset:c.core.incoming.dataEnd-c.core.incoming.offset], c.core.incoming.b[:]) // i know
+						offset = offset + c.core.incoming.dataEnd - c.core.incoming.offset
 						c.core.incoming = c.core.incoming.next
 					}
 				}
@@ -381,4 +381,8 @@ func prevDidFromB(b []byte) uint32 {
 
 func didFromB(b []byte) uint32 {
 	return uint32(b[12]) | uint32(b[13])<<8 | uint32(b[14])<<16 | uint32(b[15])<<24
+}
+
+func didFromHandshakeB(b []byte) uint32 {
+	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
 }
