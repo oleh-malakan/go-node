@@ -28,7 +28,8 @@ type incomingDatagram struct {
 }
 
 func (d *incomingDatagram) checkSig(key []byte) bool {
-	sig := signing(d.b, d.dataEnd, key)
+	copy(d.b[d.n:sha256.Size224], key[:])
+	sig := sha256.Sum224(d.b[4 : d.n+sha256.Size224])
 	return d.b[0] == sig[0] && d.b[1] == sig[1] && d.b[2] == sig[2] && d.b[3] == sig[3]
 }
 
@@ -355,11 +356,6 @@ func (h *heap) find(pid uint32) *incomingDatagram {
 // 3b + 3b + 2b.7bit + 2b.7bit = 11b.6bit // 3op + 3op + 3op+1op + 3op+1op
 // 4b + 4b + 3b.3bit + 3b.3bit = 14b.6bit // 4op + 4op + 4op + 4op
 // 4b + 4b + 4b + 4b           = 16b      // 4op + 4op + 4op + 4op
-
-func signing(b []byte, n int, key []byte) [sha256.Size224]byte {
-	copy(b[n:sha256.Size224], key[:])
-	return sha256.Sum224(b[4 : n+sha256.Size224])
-}
 
 func cidFromB(b []byte) uint32 {
 	return uint32(b[4]) | uint32(b[5])<<8 | uint32(b[6])<<16 | uint32(b[7])<<24
