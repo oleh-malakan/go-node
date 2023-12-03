@@ -69,6 +69,7 @@ func (c *container) process() {
 	for {
 		select {
 		case i := <-c.inData:
+			i.offset = dataBegin
 			i.dataEnd = i.n - 1
 			c.in(c, i)
 		case d := <-c.nextDrop:
@@ -200,23 +201,36 @@ type tlsRead interface {
 }
 
 type tlsProcess struct {
-	core     *core
-	inAnchor chan *incomingDatagram
-	inSignal chan *struct{}
+	core           *core
+	incomingAnchor *incomingDatagram
+	inAnchor       chan *incomingDatagram
+	inSignal       chan *struct{}
 }
 
 func (c *tlsProcess) read(b []byte) (n int, err error) {
-	anchor := <-c.inAnchor
-	cur := c.core.incoming
-	for cur != anchor {
-		//
-		cur = cur.next
+	var offset int
+	for {
+		if c.incomingAnchor != nil {
+			for c.core.incoming != c.incomingAnchor {
+				if c.core.incoming.b[c.core.incoming.dataEnd]&0b01000000 == 0 {
+					if len(b)-offset <= c.core.incoming.dataEnd-c.core.incoming.offset {
+						copy(b[offset:], c.core.incoming.b[c.core.incoming.offset:c.core.incoming.offset+len(b)-offset])
+						c.core.incoming.offset = c.core.incoming.offset + len(b) - offset
+						return len(b), nil
+					} else {
+						copy(b[offset:c.core.incoming.dataEnd-c.core.incoming.offset], c.core.incoming.b[:])// i know
+						offset = offset + c.core.incoming.dataEnd-c.core.incoming.offset
+						c.core.incoming = c.core.incoming.next
+					}
+				}
+			}
+			c.core.incoming = c.incomingAnchor
+			c.incomingAnchor = nil
+		} else {
+			c.inSignal <- nil
+			c.incomingAnchor = <-c.inAnchor
+		}
 	}
-	c.core.incoming = anchor
-
-	c.inSignal <- nil
-
-	return 0, nil
 }
 
 func (c *core) tslIn() {
