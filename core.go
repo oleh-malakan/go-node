@@ -17,6 +17,7 @@ const (
 
 type incomingDatagram struct {
 	b       [datagramSigLen]byte
+	n       int
 	dataEnd int
 	offset  int
 	rAddr   *net.UDPAddr
@@ -27,11 +28,17 @@ type incomingDatagram struct {
 	prevDid uint32
 }
 
+func (d *incomingDatagram) checkSig(key [sha256.Size224]byte) bool {
+	sig := signing(d.b, d.dataEnd, key)
+	return d.b[0] == sig[0] && d.b[1] == sig[1] && d.b[2] == sig[2] && d.b[3] == sig[3]
+}
+
 type outgoingDatagram struct {
 	b       [datagramSigLen]byte
+	n       int
 	dataEnd int
 	prev    *outgoingDatagram
-	pKey    [sha256.Size224]byte
+	key     [sha256.Size224]byte
 	cid     uint32
 }
 
@@ -46,15 +53,14 @@ type container struct {
 
 func (c *container) process() {
 	go func() {
-		var n int
 		for {
 			i := &incomingDatagram{}
-			n, i.rAddr, i.err = c.conn.ReadFromUDP(i.b[:])
+			i.n, i.rAddr, i.err = c.conn.ReadFromUDP(i.b[:])
 			if i.err != nil {
 
 				//continue
 			}
-			i.dataEnd = n - 1
+			i.dataEnd = i.n - 1
 			c.inData <- i
 		}
 	}()
@@ -149,9 +155,7 @@ func (c *core) in(incoming *incomingDatagram) bool {
 	o := c.outgoing
 	for o != nil {
 		if incoming.cid == o.cid {
-			sig := signing(incoming.b, incoming.dataEnd, o.pKey[:])
-			if incoming.b[1] == sig[1] && incoming.b[2] == sig[2] &&
-				incoming.b[3] == sig[3] && incoming.b[4] == sig[4] {
+			if incoming.checkSig(o.key) {
 				goto CONTINUE
 			}
 		}
@@ -335,9 +339,9 @@ func (h *heap) find(pid uint32) *incomingDatagram {
 // 4b + 4b + 3b.3bit + 3b.3bit = 14b.6bit // 4op + 4op + 4op + 4op
 // 4b + 4b + 4b + 4b           = 16b      // 4op + 4op + 4op + 4op
 
-func signing(b [datagramSigLen]byte, dataEnd int, pkey []byte) [sha256.Size224]byte {
-	copy(b[dataEnd+1:sha256.Size224], pkey)
-	return sha256.Sum224(b[4 : dataEnd+1+sha256.Size224])
+func signing(b [datagramSigLen]byte, n int, key [sha256.Size224]byte) [sha256.Size224]byte {
+	copy(b[n:sha256.Size224], key[:])
+	return sha256.Sum224(b[4 : n+sha256.Size224])
 }
 
 func cidFromB(b [datagramSigLen]byte) uint32 {
