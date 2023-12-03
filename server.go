@@ -61,7 +61,7 @@ func (s *Server) Run(clientsLimit int) error {
 
 func (s *Server) in(c *container, incoming *incomingDatagram) {
 	switch {
-	case incoming.b[0]&0b10000000 == 0:
+	case incoming.b[incoming.dataEnd]&0b10000000 == 0:
 		core := &core{
 			heap:      &heap{},
 			inData:    make(chan *incomingDatagram),
@@ -78,7 +78,7 @@ func (s *Server) in(c *container, incoming *incomingDatagram) {
 		core.next = c.next
 		c.next = core
 		go core.process()
-	case incoming.b[0]&0b10000000 == 1:
+	case incoming.b[incoming.dataEnd]&0b10000000 == 1:
 		incoming.cid = cidFromB(incoming.b)
 		if c.next != nil {
 			c.next.inData <- incoming

@@ -9,16 +9,15 @@ import (
 )
 
 const (
-	sigSumBegin    = 5
-	dataBegin      = 17
+	dataBegin      = 16
 	datagramMinLen = 560
-	datagramCap    = 1542
-	datagramSigCap = 1460
+	datagramMaxLen = 1432
+	datagramSigLen = 1460
 )
 
 type incomingDatagram struct {
-	b       []byte
-	n       int
+	b       [datagramSigLen]byte
+	dataEnd int
 	offset  int
 	rAddr   *net.UDPAddr
 	next    *incomingDatagram
@@ -29,11 +28,11 @@ type incomingDatagram struct {
 }
 
 type outgoingDatagram struct {
-	b    []byte
-	n    int
-	prev *outgoingDatagram
-	pKey [sha256.Size224]byte
-	cid  uint32
+	b       [datagramSigLen]byte
+	dataEnd int
+	prev    *outgoingDatagram
+	pKey    [sha256.Size224]byte
+	cid     uint32
 }
 
 type container struct {
@@ -47,15 +46,15 @@ type container struct {
 
 func (c *container) process() {
 	go func() {
+		var n int
 		for {
-			i := &incomingDatagram{
-				b: make([]byte, datagramSigCap),
-			}
-			i.n, i.rAddr, i.err = c.conn.ReadFromUDP(i.b)
+			i := &incomingDatagram{}
+			n, i.rAddr, i.err = c.conn.ReadFromUDP(i.b[:])
 			if i.err != nil {
 
 				//continue
 			}
+			i.dataEnd = n - 1
 			c.inData <- i
 		}
 	}()
@@ -150,8 +149,7 @@ func (c *core) in(incoming *incomingDatagram) bool {
 	o := c.outgoing
 	for o != nil {
 		if incoming.cid == o.cid {
-			copy(incoming.b[incoming.n:sha256.Size224], o.pKey[:])
-			sig := sha256.Sum224(incoming.b[sigSumBegin : incoming.n+sha256.Size224])
+			sig := signing(incoming.b, incoming.dataEnd, o.pKey[:])
 			if incoming.b[1] == sig[1] && incoming.b[2] == sig[2] &&
 				incoming.b[3] == sig[3] && incoming.b[4] == sig[4] {
 				goto CONTINUE
@@ -337,14 +335,19 @@ func (h *heap) find(pid uint32) *incomingDatagram {
 // 4b + 4b + 3b.3bit + 3b.3bit = 14b.6bit // 4op + 4op + 4op + 4op
 // 4b + 4b + 4b + 4b           = 16b      // 4op + 4op + 4op + 4op
 
-func cidFromB(b []byte) uint32 {
-	return uint32(b[5]) | uint32(b[6])<<8 | uint32(b[7])<<16 | uint32(b[8])<<24
+func signing(b [datagramSigLen]byte, dataEnd int, pkey []byte) [sha256.Size224]byte {
+	copy(b[dataEnd+1:sha256.Size224], pkey)
+	return sha256.Sum224(b[4 : dataEnd+1+sha256.Size224])
 }
 
-func prevDidFromB(b []byte) uint32 {
-	return uint32(b[9]) | uint32(b[10])<<8 | uint32(b[11])<<16 | uint32(b[12])<<24
+func cidFromB(b [datagramSigLen]byte) uint32 {
+	return uint32(b[4]) | uint32(b[5])<<8 | uint32(b[6])<<16 | uint32(b[7])<<24
 }
 
-func didFromB(b []byte) uint32 {
-	return uint32(b[13]) | uint32(b[14])<<8 | uint32(b[15])<<16 | uint32(b[16])<<24
+func prevDidFromB(b [datagramSigLen]byte) uint32 {
+	return uint32(b[8]) | uint32(b[9])<<8 | uint32(b[10])<<16 | uint32(b[11])<<24
+}
+
+func didFromB(b [datagramSigLen]byte) uint32 {
+	return uint32(b[12]) | uint32(b[13])<<8 | uint32(b[14])<<16 | uint32(b[15])<<24
 }
