@@ -60,7 +60,6 @@ func (c *container) process() {
 
 				//continue
 			}
-			i.dataEnd = i.n - 1
 			c.inData <- i
 		}
 	}()
@@ -68,6 +67,7 @@ func (c *container) process() {
 	for {
 		select {
 		case i := <-c.inData:
+			i.dataEnd = i.n - 1
 			c.in(c, i)
 		case d := <-c.nextDrop:
 			c.next = d.next
