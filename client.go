@@ -34,6 +34,10 @@ func (c *Client) Stream(nodeID string) (*Stream, error) {
 	return &Stream{}, nil
 }
 
+func (c *Client) Session() *Session {
+	return &Session{}
+}
+
 func (c *Client) process() {
 	conn, err := net.DialUDP("udp", nil, c.nodeAddresses[0])
 	if err != nil {

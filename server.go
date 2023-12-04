@@ -24,7 +24,7 @@ type Server struct {
 	nodeAddresses []*net.UDPAddr
 }
 
-func (s *Server) Handler(nodeID string, f func(stream *Stream)) (*Handler, error) {
+func (s *Server) Handler(nodeID string, f func(stream *NodeStream)) (*Handler, error) {
 	h := &Handler{
 		f: f,
 	}
@@ -35,10 +35,6 @@ func (s *Server) Handler(nodeID string, f func(stream *Stream)) (*Handler, error
 
 func (s *Server) Listen(nodeID string) (*Listener, error) {
 	return &Listener{}, nil
-}
-
-func (s *Server) Session() *Session {
-	return &Session{}
 }
 
 // clientsLimit default value 524288 if 0
@@ -100,7 +96,7 @@ func (s *Server) Close() error {
 
 type Handler struct {
 	nodeID [sha256.Size224]byte
-	f      func(connection *Stream)
+	f      func(stream *NodeStream)
 }
 
 func (h *Handler) Close() error {
@@ -109,26 +105,33 @@ func (h *Handler) Close() error {
 
 type Listener struct{}
 
-func (l *Listener) Accept() (*Stream, error) {
-	return &Stream{}, nil
+func (l *Listener) Accept() (*NodeStream, error) {
+	return &NodeStream{
+		session: &Session{},
+	}, nil
 }
 
 func (l *Listener) Close() error {
 	return nil
 }
 
-type Session struct {
-	id [sha256.Size]byte
+type NodeStream struct {
+	session *Session
+	stream  *Stream
 }
 
-func (s *Session) ID() []byte {
-	return s.id[:]
+func (s *NodeStream) Session() *Session {
+	return s.session
 }
 
-func (s *Session) Put(key string, b []byte) error {
-	return nil
+func (s *NodeStream) Send(b []byte) error {
+	return s.stream.Send(b)
 }
 
-func (s *Session) Get(key string) ([]byte, error) {
-	return nil, nil
+func (s *NodeStream) Receive() ([]byte, error) {
+	return s.stream.Receive()
+}
+
+func (s *NodeStream) Close() error {
+	return s.stream.Close()
 }

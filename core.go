@@ -85,8 +85,7 @@ func (c *container) process() {
 	}
 }
 
-type thread struct {
-}
+type thread struct{}
 
 type core struct {
 	isProcess bool
@@ -255,6 +254,27 @@ func (c *Stream) Receive() ([]byte, error) {
 }
 
 func (c *Stream) Close() error {
+	return nil
+}
+
+type Session struct {
+	id [sha256.Size]byte
+}
+
+func (s *Session) ID() []byte {
+	return s.id[:]
+}
+
+func (s *Session) Put(key string, b []byte) error {
+	return nil
+}
+
+func (s *Session) Get(key string) ([]byte, error) {
+	return nil, nil
+}
+
+// Sync auto
+func (s *Session) Sync() error {
 	return nil
 }
 
