@@ -71,40 +71,23 @@ func (s *Server) in(c *container, incoming *incomingDatagram) {
 		incoming.offset = dataHandshakeBegin
 		incoming.did = didFromHandshakeB(incoming.b)
 		core := &core{
-			heap:      &heap{},
-			inData:    make(chan *incomingDatagram),
-			nextDrop:  make(chan *core),
-			signal:    make(chan *struct{}),
-			isProcess: true,
+			heap:        &heap{},
+			inData:      make(chan *incomingDatagram),
+			nextDrop:    make(chan *core),
+			signal:      make(chan *struct{}),
+			isProcess:   true,
+			tlsInAnchor: make(chan *incomingDatagram),
+			tlsInSignal: make(chan *struct{}),
 		}
 		core.conn = tls.Server(core, s.tlsConfig)
 		core.incoming = incoming
 		core.lastIncoming = incoming
 		core.incomingAnchor = incoming
-		core.tlsRead = &tlsServerHandshake{
-			signal:   core.signal,
-			incoming: incoming,
-		}
+		core.tlsIncomingAnchor = incoming
 		core.next = c.next
 		c.next = core
 		go core.process()
 	}
-}
-
-type tlsServerHandshake struct {
-	signal   chan *struct{}
-	incoming *incomingDatagram
-}
-
-func (c *tlsServerHandshake) read(b []byte) (n int, err error) {
-	// i know
-	if len(b) != c.incoming.dataEnd - dataHandshakeBegin {
-		return 0, errors.New("handshake error, bad datagram")
-	}
-	n = copy(b, c.incoming.b[dataHandshakeBegin:c.incoming.dataEnd])
-	c.signal <- nil
-	<-c.signal
-	return 
 }
 
 func (s *Server) Close() error {
