@@ -14,7 +14,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	_, err = server.Handler("Hello, World!", func(stream *node.NodeStream) {
+	_, err = server.Handler("Hello, World!", func(stream *node.Stream) {
 		b, err := stream.Receive()
 		if err != nil {
 			log.Print(err)
