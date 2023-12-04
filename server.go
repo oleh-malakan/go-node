@@ -156,3 +156,24 @@ func (s *NodeStream) Receive() ([]byte, error) {
 func (s *NodeStream) Close() error {
 	return s.stream.Close()
 }
+
+type Session struct {
+	id [sha256.Size]byte
+}
+
+func (s *Session) ID() []byte {
+	return s.id[:]
+}
+
+func (s *Session) Put(key string, b []byte) error {
+	return nil
+}
+
+func (s *Session) Get(key string) ([]byte, error) {
+	return nil, nil
+}
+
+// Sync auto
+func (s *Session) Sync() error {
+	return nil
+}
