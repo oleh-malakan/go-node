@@ -25,16 +25,30 @@ type Server struct {
 }
 
 func (s *Server) Handler(nodeID string, f func(stream *NodeStream)) (*Handler, error) {
-	h := &Handler{
-		f: f,
+	l, err := s.Listen(nodeID)
+	if err != nil {
+		return nil, err
 	}
-	h.nodeID = sha256.Sum224([]byte(nodeID))
+	go func() {
+		for err != nil {
+			var nodeStream *NodeStream
+			nodeStream, err = l.Accept()
+			go func() {
+				f(nodeStream)
+				nodeStream.Close()
+			}()
+		}
+	}()
 
-	return h, nil
+	return &Handler{
+		listener: l,
+	}, nil
 }
 
 func (s *Server) Listen(nodeID string) (*Listener, error) {
-	return &Listener{}, nil
+	return &Listener{
+		nodeID: sha256.Sum224([]byte(nodeID)),
+	}, nil
 }
 
 // clientsLimit default value 524288 if 0
@@ -71,19 +85,25 @@ func (s *Server) in(c *container, incoming *incomingDatagram) {
 		incoming.offset = dataHandshakeBegin
 		incoming.did = didFromHandshakeB(incoming.b)
 		core := &core{
-			heap:        &heap{},
-			inData:      make(chan *incomingDatagram),
-			nextDrop:    make(chan *core),
-			signal:      make(chan *struct{}),
-			isProcess:   true,
-			tlsInAnchor: make(chan *incomingDatagram),
-			tlsInSignal: make(chan *struct{}),
+			heap:      &heap{},
+			inData:    make(chan *incomingDatagram),
+			nextDrop:  make(chan *core),
+			signal:    make(chan *struct{}),
+			isProcess: true,
+			/*
+				tlsInAnchor: make(chan *incomingDatagram),
+				tlsInSignal: make(chan *struct{}),
+			*/
 		}
-		core.conn = tls.Server(core, s.tlsConfig)
+		/*
+			core.conn = tls.Server(core, s.tlsConfig)
+		*/
 		core.incoming = incoming
 		core.lastIncoming = incoming
 		core.incomingAnchor = incoming
-		core.tlsIncomingAnchor = incoming
+		/*
+			core.tlsIncomingAnchor = incoming
+		*/
 		core.next = c.next
 		c.next = core
 		go core.process()
@@ -95,15 +115,16 @@ func (s *Server) Close() error {
 }
 
 type Handler struct {
-	nodeID [sha256.Size224]byte
-	f      func(stream *NodeStream)
+	listener *Listener
 }
 
 func (h *Handler) Close() error {
-	return nil
+	return h.listener.Close()
 }
 
-type Listener struct{}
+type Listener struct {
+	nodeID [sha256.Size224]byte
+}
 
 func (l *Listener) Accept() (*NodeStream, error) {
 	return &NodeStream{

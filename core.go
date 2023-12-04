@@ -2,7 +2,6 @@ package node
 
 import (
 	"crypto/sha256"
-	"crypto/tls"
 	"net"
 	"time"
 )
@@ -100,15 +99,18 @@ type core struct {
 	incomingAnchor *incomingDatagram
 	outgoing       *outgoingDatagram
 	heap           *heap
-
-	conn              *tls.Conn
-	tlsIncomingAnchor *incomingDatagram
-	tlsInAnchor       chan *incomingDatagram
-	tlsInSignal       chan *struct{}
+	/*
+		conn              *tls.Conn
+		tlsIncomingAnchor *incomingDatagram
+		tlsInAnchor       chan *incomingDatagram
+		tlsInSignal       chan *struct{}
+	*/
 }
 
 func (c *core) process() {
-	timerCancelHandshake := time.NewTimer(time.Duration(200) * time.Millisecond)
+	/*
+		timerCancelHandshake := time.NewTimer(time.Duration(200) * time.Millisecond)
+	*/
 	for c.isProcess {
 		select {
 		case i := <-c.inData:
@@ -117,9 +119,13 @@ func (c *core) process() {
 
 				continue
 			}
-			c.tslIn()
-		case <-c.tlsInSignal:
-			c.tslIn()
+			/*
+				c.tslIn()
+			*/
+			/*
+				case <-c.tlsInSignal:
+					c.tslIn()
+			*/
 		case d := <-c.nextDrop:
 			c.next = d.next
 			if c.next != nil {
@@ -129,10 +135,12 @@ func (c *core) process() {
 				default:
 				}
 			}
-		case <-timerCancelHandshake.C:
-			if !c.conn.ConnectionState().HandshakeComplete {
-				c.isProcess = false
-			}
+			/*
+				case <-timerCancelHandshake.C:
+					if !c.conn.ConnectionState().HandshakeComplete {
+						c.isProcess = false
+					}
+			*/
 		}
 	}
 
@@ -180,6 +188,7 @@ CONTINUE:
 	return true
 }
 
+/*
 func (c *core) tslIn() {
 	if c.incomingAnchor != c.lastIncoming {
 		select {
@@ -189,57 +198,64 @@ func (c *core) tslIn() {
 		}
 	}
 }
+*/
 
-func (c *core) Read(b []byte) (n int, err error) {
-	var offset int
-	for {
-		if c.tlsIncomingAnchor != nil {
-		LOOP:
-			if len(b)-offset <= c.incoming.dataEnd-c.incoming.offset {
-				copy(b[offset:], c.incoming.b[c.incoming.offset:c.incoming.offset+len(b)-offset])
-				c.incoming.offset = c.incoming.offset + len(b) - offset
-				return len(b), nil
-			} else {
-				copy(b[offset:c.incoming.dataEnd-c.incoming.offset], c.incoming.b[c.incoming.offset:c.lastIncoming.dataEnd])
-				offset = offset + c.incoming.dataEnd - c.incoming.offset
-				if c.incoming != c.tlsIncomingAnchor {
-					c.incoming = c.incoming.next
-					goto LOOP
+type tlsConn struct{}
+
+func (c *tlsConn) Read(b []byte) (n int, err error) {
+	/*
+		var offset int
+		for {
+			if c.tlsIncomingAnchor != nil {
+			LOOP:
+				if len(b)-offset <= c.incoming.dataEnd-c.incoming.offset {
+					copy(b[offset:], c.incoming.b[c.incoming.offset:c.incoming.offset+len(b)-offset])
+					c.incoming.offset = c.incoming.offset + len(b) - offset
+					return len(b), nil
+				} else {
+					copy(b[offset:c.incoming.dataEnd-c.incoming.offset], c.incoming.b[c.incoming.offset:c.lastIncoming.dataEnd])
+					offset = offset + c.incoming.dataEnd - c.incoming.offset
+					if c.incoming != c.tlsIncomingAnchor {
+						c.incoming = c.incoming.next
+						goto LOOP
+					}
+					c.tlsIncomingAnchor = nil
 				}
-				c.tlsIncomingAnchor = nil
+			} else {
+				c.tlsInSignal <- nil
+				c.tlsIncomingAnchor = <-c.tlsInAnchor
 			}
-		} else {
-			c.tlsInSignal <- nil
-			c.tlsIncomingAnchor = <-c.tlsInAnchor
 		}
-	}
-}
+	*/
 
-func (c *core) Write(b []byte) (n int, err error) {
 	return
 }
 
-func (c *core) Close() error {
+func (c *tlsConn) Write(b []byte) (n int, err error) {
+	return
+}
+
+func (c *tlsConn) Close() error {
 	return nil
 }
 
-func (c *core) LocalAddr() net.Addr {
+func (c *tlsConn) LocalAddr() net.Addr {
 	return nil
 }
 
-func (c *core) RemoteAddr() net.Addr {
+func (c *tlsConn) RemoteAddr() net.Addr {
 	return nil
 }
 
-func (c *core) SetDeadline(t time.Time) error {
+func (c *tlsConn) SetDeadline(t time.Time) error {
 	return nil
 }
 
-func (c *core) SetReadDeadline(t time.Time) error {
+func (c *tlsConn) SetReadDeadline(t time.Time) error {
 	return nil
 }
 
-func (c *core) SetWriteDeadline(t time.Time) error {
+func (c *tlsConn) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 

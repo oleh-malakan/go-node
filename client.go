@@ -50,16 +50,20 @@ func (c *Client) process() {
 		nextDrop: make(chan *core),
 		in:       c.in,
 		next: &core{
-			heap:        &heap{},
-			inData:      make(chan *incomingDatagram),
-			nextDrop:    make(chan *core),
-			signal:      make(chan *struct{}),
-			isProcess:   true,
-			tlsInAnchor: make(chan *incomingDatagram),
-			tlsInSignal: make(chan *struct{}),
+			heap:      &heap{},
+			inData:    make(chan *incomingDatagram),
+			nextDrop:  make(chan *core),
+			signal:    make(chan *struct{}),
+			isProcess: true,
+			/*
+				tlsInAnchor: make(chan *incomingDatagram),
+				tlsInSignal: make(chan *struct{}),
+			*/
 		},
 	}
-	container.next.conn = tls.Client(container.next, c.tlsConfig)
+	/*
+		container.next.conn = tls.Client(container.next, c.tlsConfig)
+	*/
 	go container.next.process()
 	container.process()
 }
