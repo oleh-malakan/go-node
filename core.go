@@ -85,6 +85,9 @@ func (c *container) process() {
 	}
 }
 
+type thread struct {
+}
+
 type core struct {
 	isProcess bool
 	next      *core

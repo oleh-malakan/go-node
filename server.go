@@ -37,6 +37,10 @@ func (s *Server) Listen(nodeID string) (*Listener, error) {
 	return &Listener{}, nil
 }
 
+func (s *Server) Session() *Session {
+	return &Session{}
+}
+
 // clientsLimit default value 524288 if 0
 func (s *Server) Run(clientsLimit int) error {
 	if clientsLimit <= 0 {
@@ -111,4 +115,20 @@ func (l *Listener) Accept() (*Stream, error) {
 
 func (l *Listener) Close() error {
 	return nil
+}
+
+type Session struct {
+	id [sha256.Size]byte
+}
+
+func (s *Session) ID() []byte {
+	return s.id[:]
+}
+
+func (s *Session) Put(key string, b []byte) error {
+	return nil
+}
+
+func (s *Session) Get(key string) ([]byte, error) {
+	return nil, nil
 }
