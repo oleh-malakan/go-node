@@ -2,24 +2,16 @@ package node
 
 import (
 	"crypto/sha256"
-	"crypto/tls"
-	"errors"
 	"net"
 )
 
-func New(tlsConfig *tls.Config, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
-	if tlsConfig == nil {
-		return nil, errors.New("require tls config")
-	}
-
+func New(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
 	return &Server{
-		tlsConfig:     tlsConfig,
 		nodeAddresses: nodeAddresses,
 	}, nil
 }
 
 type Server struct {
-	tlsConfig     *tls.Config
 	address       *net.UDPAddr
 	nodeAddresses []*net.UDPAddr
 }
@@ -90,20 +82,9 @@ func (s *Server) in(c *container, incoming *incomingDatagram) {
 			nextDrop:  make(chan *core),
 			signal:    make(chan *struct{}),
 			isProcess: true,
-			/*
-				tlsInAnchor: make(chan *incomingDatagram),
-				tlsInSignal: make(chan *struct{}),
-			*/
 		}
-		/*
-			core.conn = tls.Server(core, s.tlsConfig)
-		*/
 		core.incoming = incoming
 		core.lastIncoming = incoming
-		core.incomingAnchor = incoming
-		/*
-			core.tlsIncomingAnchor = incoming
-		*/
 		core.next = c.next
 		c.next = core
 		go core.process()

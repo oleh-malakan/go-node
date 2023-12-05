@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"log"
 	"net"
 
@@ -9,7 +8,7 @@ import (
 )
 
 func main() {
-	server, err := node.New(&tls.Config{}, &net.UDPAddr{})
+	server, err := node.New(&net.UDPAddr{})
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"fmt"
 	"log"
 	"net"
@@ -10,7 +9,7 @@ import (
 )
 
 func main() {
-	client, err := node.Connect(&tls.Config{}, &net.UDPAddr{})
+	client, err := node.Connect(&net.UDPAddr{})
 	if err != nil {
 		log.Fatal(err)
 	}

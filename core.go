@@ -3,7 +3,6 @@ package node
 import (
 	"crypto/sha256"
 	"net"
-	"time"
 )
 
 const (
@@ -84,8 +83,6 @@ func (c *container) process() {
 	}
 }
 
-type thread struct{}
-
 type core struct {
 	isProcess bool
 	next      *core
@@ -93,24 +90,14 @@ type core struct {
 	drop      chan *core
 	signal    chan *struct{}
 
-	inData         chan *incomingDatagram
-	lastIncoming   *incomingDatagram
-	incoming       *incomingDatagram
-	incomingAnchor *incomingDatagram
-	outgoing       *outgoingDatagram
-	heap           *heap
-	/*
-		conn              *tls.Conn
-		tlsIncomingAnchor *incomingDatagram
-		tlsInAnchor       chan *incomingDatagram
-		tlsInSignal       chan *struct{}
-	*/
+	inData       chan *incomingDatagram
+	lastIncoming *incomingDatagram
+	incoming     *incomingDatagram
+	outgoing     *outgoingDatagram
+	heap         *heap
 }
 
 func (c *core) process() {
-	/*
-		timerCancelHandshake := time.NewTimer(time.Duration(200) * time.Millisecond)
-	*/
 	for c.isProcess {
 		select {
 		case i := <-c.inData:
@@ -119,13 +106,6 @@ func (c *core) process() {
 
 				continue
 			}
-			/*
-				c.tslIn()
-			*/
-			/*
-				case <-c.tlsInSignal:
-					c.tslIn()
-			*/
 		case d := <-c.nextDrop:
 			c.next = d.next
 			if c.next != nil {
@@ -135,12 +115,6 @@ func (c *core) process() {
 				default:
 				}
 			}
-			/*
-				case <-timerCancelHandshake.C:
-					if !c.conn.ConnectionState().HandshakeComplete {
-						c.isProcess = false
-					}
-			*/
 		}
 	}
 
@@ -186,77 +160,6 @@ CONTINUE:
 	}
 
 	return true
-}
-
-/*
-func (c *core) tslIn() {
-	if c.incomingAnchor != c.lastIncoming {
-		select {
-		case c.tlsInAnchor <- c.lastIncoming:
-			c.incomingAnchor = c.lastIncoming
-		default:
-		}
-	}
-}
-*/
-
-type tlsConn struct{}
-
-func (c *tlsConn) Read(b []byte) (n int, err error) {
-	/*
-		var offset int
-		for {
-			if c.tlsIncomingAnchor != nil {
-			LOOP:
-				if len(b)-offset <= c.incoming.dataEnd-c.incoming.offset {
-					copy(b[offset:], c.incoming.b[c.incoming.offset:c.incoming.offset+len(b)-offset])
-					c.incoming.offset = c.incoming.offset + len(b) - offset
-					return len(b), nil
-				} else {
-					copy(b[offset:c.incoming.dataEnd-c.incoming.offset], c.incoming.b[c.incoming.offset:c.lastIncoming.dataEnd])
-					offset = offset + c.incoming.dataEnd - c.incoming.offset
-					if c.incoming != c.tlsIncomingAnchor {
-						c.incoming = c.incoming.next
-						goto LOOP
-					}
-					c.tlsIncomingAnchor = nil
-				}
-			} else {
-				c.tlsInSignal <- nil
-				c.tlsIncomingAnchor = <-c.tlsInAnchor
-			}
-		}
-	*/
-
-	return
-}
-
-func (c *tlsConn) Write(b []byte) (n int, err error) {
-	return
-}
-
-func (c *tlsConn) Close() error {
-	return nil
-}
-
-func (c *tlsConn) LocalAddr() net.Addr {
-	return nil
-}
-
-func (c *tlsConn) RemoteAddr() net.Addr {
-	return nil
-}
-
-func (c *tlsConn) SetDeadline(t time.Time) error {
-	return nil
-}
-
-func (c *tlsConn) SetReadDeadline(t time.Time) error {
-	return nil
-}
-
-func (c *tlsConn) SetWriteDeadline(t time.Time) error {
-	return nil
 }
 
 type Stream struct{}
