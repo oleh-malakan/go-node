@@ -39,7 +39,6 @@ func (c *Client) process() {
 		nextDrop: make(chan *core),
 		in:       c.in,
 		next: &core{
-			heap:      &heap{},
 			inData:    make(chan *incomingDatagram),
 			nextDrop:  make(chan *core),
 			signal:    make(chan *struct{}),
@@ -51,7 +50,5 @@ func (c *Client) process() {
 }
 
 func (client *Client) in(c *container, incoming *incomingDatagram) {
-	incoming.offset = dataBegin
-	incoming.cid = cidFromB(incoming.b)
 	c.next.inData <- incoming
 }

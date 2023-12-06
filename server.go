@@ -17,23 +17,8 @@ type Server struct {
 }
 
 func (s *Server) Handler(nodeID string, f func(stream *Stream)) (*Handler, error) {
-	l, err := s.Listen(nodeID)
-	if err != nil {
-		return nil, err
-	}
-	go func() {
-		for err != nil {
-			var stream *Stream
-			stream, err = l.Accept()
-			go func() {
-				f(stream)
-				stream.Close()
-			}()
-		}
-	}()
-
 	return &Handler{
-		listener: l,
+		nodeID: sha256.Sum224([]byte(nodeID)),
 	}, nil
 }
 
@@ -67,17 +52,12 @@ func (s *Server) Run(clientsLimit int) error {
 
 func (s *Server) in(c *container, incoming *incomingDatagram) {
 	switch {
-	case incoming.b[incoming.dataEnd]&0b10000000 == 0:
-		incoming.offset = dataBegin
-		incoming.cid = cidFromB(incoming.b)
+	case incoming.b[0]&0b10000000 == 0:
 		if c.next != nil {
 			c.next.inData <- incoming
 		}
-	case incoming.b[incoming.dataEnd]&0b10000000 == 1:
-		incoming.offset = dataHandshakeBegin
-		incoming.did = didFromHandshakeB(incoming.b)
+	case incoming.b[0]&0b10000000 == 1:
 		core := &core{
-			heap:      &heap{},
 			inData:    make(chan *incomingDatagram),
 			nextDrop:  make(chan *core),
 			signal:    make(chan *struct{}),
@@ -96,11 +76,11 @@ func (s *Server) Close() error {
 }
 
 type Handler struct {
-	listener *Listener
+	nodeID [sha256.Size224]byte
 }
 
 func (h *Handler) Close() error {
-	return h.listener.Close()
+	return nil
 }
 
 type Listener struct {
