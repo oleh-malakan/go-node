@@ -5,19 +5,19 @@ import (
 )
 
 type incomingDatagram struct {
-	b      []byte
-	n      int
-	offset int
 	rAddr  *net.UDPAddr
 	next   *incomingDatagram
+	b      []byte
 	err    error
+	n      int
+	offset int
 }
 
 type outgoingDatagram struct {
+	prev   *outgoingDatagram
 	b      []byte
 	n      int
 	offset int
-	prev   *outgoingDatagram
 }
 
 type core struct {
