@@ -33,22 +33,38 @@ func (c *Client) process() {
 
 	}
 
-	container := &container{
-		conn:     conn,
-		inData:   make(chan *incomingDatagram),
-		nextDrop: make(chan *core),
-		in:       c.in,
-		next: &core{
-			inData:    make(chan *incomingDatagram),
-			nextDrop:  make(chan *core),
-			signal:    make(chan *struct{}),
-			isProcess: true,
-		},
+	currentCore := &core{
+		inData:    make(chan *incomingDatagram),
+		nextDrop:  make(chan *core),
+		signal:    make(chan *struct{}),
+		isProcess: true,
+		inProcess: coreInProcess,
+		onDestroy: coreOnDestroy,
 	}
-	go container.next.process()
-	container.process()
-}
+	endCore := &core{
+		inData:    make(chan *incomingDatagram),
+		nextDrop:  make(chan *core),
+		signal:    make(chan *struct{}),
+		isProcess: true,
+		inProcess: coreEndInProcess,
+		onDestroy: coreOnDestroy,
+	}
 
-func (client *Client) in(c *container, incoming *incomingDatagram) {
-	c.next.inData <- incoming
+	currentCore.next = endCore
+	endCore.drop = currentCore.nextDrop
+
+	go currentCore.process()
+	go endCore.process()
+
+	for {
+		i := &incomingDatagram{
+			b: make([]byte, 1432),
+		}
+		i.n, i.rAddr, i.err = conn.ReadFromUDP(i.b)
+		if i.err != nil {
+
+			//continue
+		}
+		currentCore.inData <- i
+	}
 }

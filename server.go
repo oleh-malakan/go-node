@@ -8,12 +8,15 @@ import (
 func New(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
 	return &Server{
 		nodeAddresses: nodeAddresses,
+		clientCounter: newCounter(),
 	}, nil
 }
 
 type Server struct {
 	address       *net.UDPAddr
 	nodeAddresses []*net.UDPAddr
+	clientCounter *counter
+	clientsLimit  int
 }
 
 func (s *Server) Handler(nodeID string, f func(stream *Stream)) (*Handler, error) {
@@ -33,42 +36,84 @@ func (s *Server) Run(clientsLimit int) error {
 	if clientsLimit <= 0 {
 		clientsLimit = 524288
 	}
+	s.clientsLimit = clientsLimit
 
 	conn, err := net.ListenUDP("udp", s.address)
 	if err != nil {
 		return err
 	}
 
-	container := &container{
-		conn:     conn,
-		inData:   make(chan *incomingDatagram),
-		nextDrop: make(chan *core),
-		in:       s.in,
-	}
-	container.process()
+	go s.clientCounter.process()
 
-	return nil
+	beginCore := &core{
+		inData:    make(chan *incomingDatagram),
+		nextDrop:  make(chan *core),
+		signal:    make(chan *struct{}),
+		isProcess: true,
+		inProcess: s.coreBeginInProcess,
+		onDestroy: coreOnDestroy,
+	}
+	endCore := &core{
+		inData:    make(chan *incomingDatagram),
+		nextDrop:  make(chan *core),
+		signal:    make(chan *struct{}),
+		isProcess: true,
+		inProcess: coreEndInProcess,
+		onDestroy: coreOnDestroy,
+	}
+
+	beginCore.next = endCore
+	endCore.drop = beginCore.nextDrop
+
+	go beginCore.process()
+	go endCore.process()
+
+	for {
+		i := &incomingDatagram{
+			b: make([]byte, 1432),
+		}
+		i.n, i.rAddr, i.err = conn.ReadFromUDP(i.b)
+		if i.err != nil {
+
+			//continue
+		}
+		beginCore.inData <- i
+	}
 }
 
-func (s *Server) in(c *container, incoming *incomingDatagram) {
+func (s *Server) coreBeginInProcess(c *core, incoming *incomingDatagram) {
 	switch {
 	case incoming.b[0]&0b10000000 == 0:
-		if c.next != nil {
-			c.next.inData <- incoming
-		}
+		c.next.inData <- incoming
 	case incoming.b[0]&0b10000000 == 1:
-		core := &core{
-			inData:    make(chan *incomingDatagram),
-			nextDrop:  make(chan *core),
-			signal:    make(chan *struct{}),
-			isProcess: true,
+		if <-s.clientCounter.value <= s.clientsLimit {
+			new := &core{
+				inData:       make(chan *incomingDatagram),
+				nextDrop:     make(chan *core),
+				signal:       make(chan *struct{}),
+				isProcess:    true,
+				inProcess:    coreInProcess,
+				onDestroy:    s.coreOnDestroy,
+				next:         c.next,
+				drop:         c.nextDrop,
+				incoming:     incoming,
+				lastIncoming: incoming,
+			}
+			c.next.drop = new.nextDrop
+			select {
+			case c.next.signal <- nil:
+			default:
+			}
+			c.next = new
+			go new.process()
+
+			s.clientCounter.inc <- nil
 		}
-		core.incoming = incoming
-		core.lastIncoming = incoming
-		core.next = c.next
-		c.next = core
-		go core.process()
 	}
+}
+
+func (s *Server) coreOnDestroy() {
+	s.clientCounter.dec <- nil
 }
 
 func (s *Server) Close() error {
