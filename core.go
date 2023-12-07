@@ -43,10 +43,7 @@ func (c *core) process() {
 		case d := <-c.nextDrop:
 			c.next = d.next
 			c.next.drop = c.nextDrop
-			select {
-			case c.next.signal <- nil:
-			default:
-			}
+			c.next.asyncSignal()
 		}
 	}
 
@@ -72,6 +69,13 @@ func coreInProcess(core *core, incoming *incomingDatagram) {
 func coreEndInProcess(core *core, incoming *incomingDatagram) {}
 
 func coreOnDestroy() {}
+
+func (c *core) asyncSignal() {
+	select {
+	case c.signal <- nil:
+	default:
+	}
+}
 
 type Stream struct{}
 

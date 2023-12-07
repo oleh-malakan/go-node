@@ -100,10 +100,7 @@ func (s *Server) coreBeginInProcess(c *core, incoming *incomingDatagram) {
 				lastIncoming: incoming,
 			}
 			c.next.drop = new.nextDrop
-			select {
-			case c.next.signal <- nil:
-			default:
-			}
+			c.next.asyncSignal()
 			c.next = new
 			go new.process()
 
