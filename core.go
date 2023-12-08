@@ -21,12 +21,12 @@ type outgoingDatagram struct {
 }
 
 type core struct {
-	next      *core
-	nextDrop  chan *core
-	drop      chan *core
-	signal    chan *struct{}
-	inProcess func(core *core, incoming *incomingDatagram)
-	onDestroy func()
+	next           *core
+	nextDrop       chan *core
+	drop           chan *core
+	signal         chan *struct{}
+	inProcess      func(core *core, incoming *incomingDatagram)
+	destroyProcess func()
 
 	inData       chan *incomingDatagram
 	lastIncoming *incomingDatagram
@@ -47,7 +47,7 @@ func (c *core) process() {
 		}
 	}
 
-	c.onDestroy()
+	c.destroyProcess()
 	for {
 		select {
 		case i := <-c.inData:
@@ -68,7 +68,7 @@ func coreInProcess(core *core, incoming *incomingDatagram) {
 
 func coreEndInProcess(core *core, incoming *incomingDatagram) {}
 
-func coreOnDestroy() {}
+func coreDestroyProcess() {}
 
 func (c *core) asyncSignal() {
 	select {

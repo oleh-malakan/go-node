@@ -46,20 +46,20 @@ func (s *Server) Run(clientsLimit int) error {
 	go s.clientCounter.process()
 
 	beginCore := &core{
-		inData:    make(chan *incomingDatagram),
-		nextDrop:  make(chan *core),
-		signal:    make(chan *struct{}),
-		isProcess: true,
-		inProcess: s.coreBeginInProcess,
-		onDestroy: coreOnDestroy,
+		inData:         make(chan *incomingDatagram),
+		nextDrop:       make(chan *core),
+		signal:         make(chan *struct{}),
+		isProcess:      true,
+		inProcess:      s.coreBeginInProcess,
+		destroyProcess: coreDestroyProcess,
 	}
 	endCore := &core{
-		inData:    make(chan *incomingDatagram),
-		nextDrop:  make(chan *core),
-		signal:    make(chan *struct{}),
-		isProcess: true,
-		inProcess: coreEndInProcess,
-		onDestroy: coreOnDestroy,
+		inData:         make(chan *incomingDatagram),
+		nextDrop:       make(chan *core),
+		signal:         make(chan *struct{}),
+		isProcess:      true,
+		inProcess:      coreEndInProcess,
+		destroyProcess: coreDestroyProcess,
 	}
 
 	beginCore.next = endCore
@@ -88,16 +88,16 @@ func (s *Server) coreBeginInProcess(c *core, incoming *incomingDatagram) {
 	case incoming.b[0]&0b10000000 == 1:
 		if <-s.clientCounter.value <= s.clientsLimit {
 			new := &core{
-				inData:       make(chan *incomingDatagram),
-				nextDrop:     make(chan *core),
-				signal:       make(chan *struct{}),
-				isProcess:    true,
-				inProcess:    coreInProcess,
-				onDestroy:    s.coreOnDestroy,
-				next:         c.next,
-				drop:         c.nextDrop,
-				incoming:     incoming,
-				lastIncoming: incoming,
+				inData:         make(chan *incomingDatagram),
+				nextDrop:       make(chan *core),
+				signal:         make(chan *struct{}),
+				isProcess:      true,
+				inProcess:      coreInProcess,
+				destroyProcess: s.coreDestroyProcess,
+				next:           c.next,
+				drop:           c.nextDrop,
+				incoming:       incoming,
+				lastIncoming:   incoming,
 			}
 			c.next.drop = new.nextDrop
 			c.next.asyncSignal()
@@ -109,7 +109,7 @@ func (s *Server) coreBeginInProcess(c *core, incoming *incomingDatagram) {
 	}
 }
 
-func (s *Server) coreOnDestroy() {
+func (s *Server) coreDestroyProcess() {
 	s.clientCounter.dec <- nil
 }
 

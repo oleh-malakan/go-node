@@ -34,20 +34,20 @@ func (c *Client) process() {
 	}
 
 	currentCore := &core{
-		inData:    make(chan *incomingDatagram),
-		nextDrop:  make(chan *core),
-		signal:    make(chan *struct{}),
-		isProcess: true,
-		inProcess: coreInProcess,
-		onDestroy: coreOnDestroy,
+		inData:         make(chan *incomingDatagram),
+		nextDrop:       make(chan *core),
+		signal:         make(chan *struct{}),
+		isProcess:      true,
+		inProcess:      coreInProcess,
+		destroyProcess: coreDestroyProcess,
 	}
 	endCore := &core{
-		inData:    make(chan *incomingDatagram),
-		nextDrop:  make(chan *core),
-		signal:    make(chan *struct{}),
-		isProcess: true,
-		inProcess: coreEndInProcess,
-		onDestroy: coreOnDestroy,
+		inData:         make(chan *incomingDatagram),
+		nextDrop:       make(chan *core),
+		signal:         make(chan *struct{}),
+		isProcess:      true,
+		inProcess:      coreEndInProcess,
+		destroyProcess: coreDestroyProcess,
 	}
 
 	currentCore.next = endCore
