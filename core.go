@@ -1,6 +1,7 @@
 package node
 
 import (
+	"crypto/cipher"
 	"encoding/binary"
 	"net"
 )
@@ -60,6 +61,7 @@ type core struct {
 	incoming     *incomingDatagram
 	outgoing     *outgoingDatagram
 	cid          *id
+	aead         cipher.AEAD
 	isProcess    bool
 }
 

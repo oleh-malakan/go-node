@@ -131,6 +131,10 @@ func (s *Server) serverHello(incoming *incomingDatagram) {
 	_, err = s.transport.write(b, incoming.rAddr)
 }
 
+func (s *Server) decodeClientHello2(incoming *incomingDatagram) bool {
+	return true
+}
+
 func (s *Server) coreBeginInProcess(c *core, incoming *incomingDatagram) {
 	if incoming.cipherB[0]&0b10000000 != 0 {
 		if incoming.b == nil {
@@ -169,7 +173,7 @@ func (s *Server) coreInProcess(core *core, incoming *incomingDatagram) {
 
 func (s *Server) coreEndInProcess(core *core, incoming *incomingDatagram) {
 	if incoming.cipherB[0]&0b01000000 != 0 {
-		if incoming.decode() {
+		if s.decodeClientHello2(incoming) {
 			core.next.inData <- incoming
 		}
 	}
