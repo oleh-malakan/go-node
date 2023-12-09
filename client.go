@@ -5,7 +5,7 @@ import (
 	"net"
 )
 
-func Connect(nodeAddresses ...*net.UDPAddr) (*Client, error) {
+func Dial(nodeAddresses ...*net.UDPAddr) (*Client, error) {
 	if len(nodeAddresses) == 0 {
 		return nil, errors.New("node address not specified")
 	}
@@ -23,7 +23,7 @@ type Client struct {
 	nodeAddresses []*net.UDPAddr
 }
 
-func (c *Client) Stream(nodeID string) (*Stream, error) {
+func (c *Client) Connect(nodeID string) (*Stream, error) {
 	return &Stream{}, nil
 }
 
@@ -36,7 +36,6 @@ func (c *Client) process() {
 	currentCore := &core{
 		inData:         make(chan *incomingDatagram),
 		drop:           make(chan *core, 1),
-		signal:         make(chan *struct{}),
 		isProcess:      true,
 		inProcess:      coreInProcess,
 		destroyProcess: coreDestroyProcess,
@@ -44,7 +43,6 @@ func (c *Client) process() {
 	endCore := &core{
 		inData:         make(chan *incomingDatagram),
 		drop:           make(chan *core),
-		signal:         make(chan *struct{}),
 		isProcess:      true,
 		inProcess:      coreEndInProcess,
 		destroyProcess: coreDestroyProcess,

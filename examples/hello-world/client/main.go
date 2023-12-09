@@ -9,12 +9,12 @@ import (
 )
 
 func main() {
-	client, err := node.Connect(&net.UDPAddr{})
+	client, err := node.Dial(&net.UDPAddr{})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	stream, err := client.Stream("Hello, World!")
+	stream, err := client.Connect("Hello, World!")
 	if err != nil {
 		log.Fatal(err)
 	}

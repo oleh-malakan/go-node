@@ -1,16 +1,38 @@
 package node
 
 import (
+	"encoding/binary"
 	"net"
 )
 
+const (
+	datagramMinLen = 560
+	datagramCap    = 1432
+	dataCap        = 1416
+)
+
 type incomingDatagram struct {
-	rAddr  *net.UDPAddr
-	next   *incomingDatagram
-	b      []byte
-	err    error
-	n      int
-	offset int
+	rAddr   *net.UDPAddr
+	next    *incomingDatagram
+	cipherB []byte
+	b       []byte
+	cid     *id
+	err     error
+	n       int
+	offset  int
+}
+
+func (d *incomingDatagram) prepareCID() {
+	d.cid = &id{
+		ID1: binary.BigEndian.Uint64(d.cipherB[1:9]),
+		ID2: binary.BigEndian.Uint64(d.cipherB[9:17]),
+		ID3: binary.BigEndian.Uint64(d.cipherB[17:25]),
+		ID4: binary.BigEndian.Uint64(d.cipherB[25:33]),
+	}
+}
+
+func (d *incomingDatagram) decode() bool {
+	return true
 }
 
 type outgoingDatagram struct {
@@ -20,10 +42,16 @@ type outgoingDatagram struct {
 	offset int
 }
 
+type id struct {
+	ID1 uint64
+	ID2 uint64
+	ID3 uint64
+	ID4 uint64
+}
+
 type core struct {
 	next           *core
 	drop           chan *core
-	signal         chan *struct{}
 	inProcess      func(core *core, incoming *incomingDatagram)
 	destroyProcess func()
 
@@ -31,6 +59,7 @@ type core struct {
 	lastIncoming *incomingDatagram
 	incoming     *incomingDatagram
 	outgoing     *outgoingDatagram
+	cid          *id
 	isProcess    bool
 }
 
@@ -56,26 +85,20 @@ func (c *core) process() {
 }
 
 func coreInProcess(core *core, incoming *incomingDatagram) {
+	if incoming.decode() {
 
-	//
+		//
 
-	core.next.inData <- incoming
+	}
 }
 
 func coreEndInProcess(core *core, incoming *incomingDatagram) {}
 
 func coreDestroyProcess() {}
 
-func (c *core) aasyncSignal() {
-	select {
-	case c.signal <- nil:
-	default:
-	}
-}
-
 type Stream struct{}
 
-func (s Stream) NamedStream(id string) (*NamedStream, error) {
+func (s Stream) MakeStream(id string) (*NamedStream, error) {
 	return &NamedStream{}, nil
 }
 
@@ -103,6 +126,18 @@ func (s *NamedStream) Receive() ([]byte, error) {
 
 func (s *NamedStream) Close() error {
 	return nil
+}
+
+type transport struct {
+	conn *net.UDPConn
+}
+
+func (t *transport) write(b []byte, addr *net.UDPAddr) (int, error) {
+	return t.conn.WriteToUDP(b, addr)
+}
+
+func (t *transport) read(b []byte) (int, *net.UDPAddr, error) {
+	return t.conn.ReadFromUDP(b)
 }
 
 func newCounter() *counter {
