@@ -47,7 +47,7 @@ func (s *Server) Run(clientsLimit int) error {
 
 	beginCore := &core{
 		inData:         make(chan *incomingDatagram),
-		nextDrop:       make(chan *core),
+		drop:           make(chan *core, 1),
 		signal:         make(chan *struct{}),
 		isProcess:      true,
 		inProcess:      s.coreBeginInProcess,
@@ -55,7 +55,7 @@ func (s *Server) Run(clientsLimit int) error {
 	}
 	endCore := &core{
 		inData:         make(chan *incomingDatagram),
-		nextDrop:       make(chan *core),
+		drop:           make(chan *core),
 		signal:         make(chan *struct{}),
 		isProcess:      true,
 		inProcess:      coreEndInProcess,
@@ -63,7 +63,6 @@ func (s *Server) Run(clientsLimit int) error {
 	}
 
 	beginCore.next = endCore
-	endCore.drop = beginCore.nextDrop
 
 	go beginCore.process()
 	go endCore.process()
@@ -89,18 +88,15 @@ func (s *Server) coreBeginInProcess(c *core, incoming *incomingDatagram) {
 		if <-s.clientCounter.value <= s.clientsLimit {
 			new := &core{
 				inData:         make(chan *incomingDatagram),
-				nextDrop:       make(chan *core),
+				drop:           make(chan *core),
 				signal:         make(chan *struct{}),
 				isProcess:      true,
 				inProcess:      coreInProcess,
 				destroyProcess: s.coreDestroyProcess,
 				next:           c.next,
-				drop:           c.nextDrop,
 				incoming:       incoming,
 				lastIncoming:   incoming,
 			}
-			c.next.drop = new.nextDrop
-			c.next.asyncSignal()
 			c.next = new
 			go new.process()
 

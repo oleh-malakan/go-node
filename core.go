@@ -22,7 +22,6 @@ type outgoingDatagram struct {
 
 type core struct {
 	next           *core
-	nextDrop       chan *core
 	drop           chan *core
 	signal         chan *struct{}
 	inProcess      func(core *core, incoming *incomingDatagram)
@@ -40,10 +39,8 @@ func (c *core) process() {
 		select {
 		case i := <-c.inData:
 			c.inProcess(c, i)
-		case d := <-c.nextDrop:
+		case d := <-c.next.drop:
 			c.next = d.next
-			c.next.drop = c.nextDrop
-			c.next.asyncSignal()
 		}
 	}
 
@@ -52,7 +49,6 @@ func (c *core) process() {
 		select {
 		case i := <-c.inData:
 			c.next.inData <- i
-		case <-c.signal:
 		case c.drop <- c:
 			return
 		}
@@ -70,7 +66,7 @@ func coreEndInProcess(core *core, incoming *incomingDatagram) {}
 
 func coreDestroyProcess() {}
 
-func (c *core) asyncSignal() {
+func (c *core) aasyncSignal() {
 	select {
 	case c.signal <- nil:
 	default:

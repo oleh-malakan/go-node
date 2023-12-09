@@ -35,7 +35,7 @@ func (c *Client) process() {
 
 	currentCore := &core{
 		inData:         make(chan *incomingDatagram),
-		nextDrop:       make(chan *core),
+		drop:           make(chan *core, 1),
 		signal:         make(chan *struct{}),
 		isProcess:      true,
 		inProcess:      coreInProcess,
@@ -43,7 +43,7 @@ func (c *Client) process() {
 	}
 	endCore := &core{
 		inData:         make(chan *incomingDatagram),
-		nextDrop:       make(chan *core),
+		drop:           make(chan *core),
 		signal:         make(chan *struct{}),
 		isProcess:      true,
 		inProcess:      coreEndInProcess,
@@ -51,7 +51,6 @@ func (c *Client) process() {
 	}
 
 	currentCore.next = endCore
-	endCore.drop = currentCore.nextDrop
 
 	go currentCore.process()
 	go endCore.process()
