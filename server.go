@@ -6,7 +6,6 @@ import (
 	"crypto/ecdh"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/binary"
 	"net"
 )
 
@@ -124,10 +123,8 @@ func (s *Server) serverHello(incoming *incomingDatagram) {
 		return
 	}
 
-	binary.BigEndian.PutUint64(b[33:41], uint64(aead.NonceSize()))
-	openDataLen := 41 + aead.NonceSize()
-	rand.Reader.Read(b[41:openDataLen])
-	aead.Seal(b[:openDataLen], b[41:openDataLen], s.newClientID(), b[:openDataLen])
+	rand.Reader.Read(b[33:45])
+	aead.Seal(b[:45], b[33:45], s.newClientID(), b[:45])
 	_, err = s.transport.write(b, incoming.rAddr)
 }
 
