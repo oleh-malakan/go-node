@@ -93,7 +93,7 @@ func (s *Server) Run(clientsLimit int) error {
 	}
 }
 
-func (s *Server) newClientID() []byte {
+func (s *Server) newCID() []byte {
 	var ID []byte
 
 	return ID[:]
@@ -123,8 +123,8 @@ func (s *Server) serverHello(incoming *incomingDatagram) {
 		return
 	}
 
-	rand.Reader.Read(b[33:45])
-	aead.Seal(b[:45], b[33:45], s.newClientID(), b[:45])
+	rand.Reader.Read(b[81:93])
+	aead.Seal(b[:33], b[81:93], s.newCID(), b[:33])
 	_, err = s.transport.write(b, incoming.rAddr)
 }
 
