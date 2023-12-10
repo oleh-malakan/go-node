@@ -126,6 +126,7 @@ func (s *Server) serverHello(incoming *incomingDatagram) {
 
 	rand.Reader.Read(b[81:93])
 	aead.Seal(b[:33], b[81:93], s.newClientID(), b[:33])
+	// error b serverHello
 	_, err = s.transport.write(b, incoming.rAddr)
 }
 
