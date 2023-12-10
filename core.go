@@ -61,7 +61,6 @@ type core struct {
 	incoming     *incomingDatagram
 	outgoing     *outgoingDatagram
 	cID          *id
-	contactCID   *id
 	aead         cipher.AEAD
 	isProcess    bool
 }
