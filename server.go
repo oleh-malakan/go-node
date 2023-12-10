@@ -130,6 +130,7 @@ func (s *Server) serverHello(incoming *incomingDatagram) {
 }
 
 func (s *Server) decodeClientHello2(incoming *incomingDatagram) bool {
+	// ClientID != CID
 	return true
 }
 
