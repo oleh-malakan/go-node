@@ -93,7 +93,8 @@ func (s *Server) Run(clientsLimit int) error {
 	}
 }
 
-func (s *Server) newCID() []byte {
+// ClientID != CID
+func (s *Server) newClientID() []byte {
 	var ID []byte
 
 	return ID[:]
@@ -124,7 +125,7 @@ func (s *Server) serverHello(incoming *incomingDatagram) {
 	}
 
 	rand.Reader.Read(b[81:93])
-	aead.Seal(b[:33], b[81:93], s.newCID(), b[:33])
+	aead.Seal(b[:33], b[81:93], s.newClientID(), b[:33])
 	_, err = s.transport.write(b, incoming.rAddr)
 }
 
@@ -160,6 +161,7 @@ func (s *Server) coreBeginInProcess(c *core, incoming *incomingDatagram) {
 }
 
 func (s *Server) coreInProcess(core *core, incoming *incomingDatagram) {
+	// ClientID != CID
 	if core.cid.ID1 != incoming.cid.ID1 || core.cid.ID2 != incoming.cid.ID2 ||
 		core.cid.ID3 != incoming.cid.ID3 || core.cid.ID4 != incoming.cid.ID4 {
 		core.next.inData <- incoming
