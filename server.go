@@ -93,13 +93,6 @@ func (s *Server) Run(clientsLimit int) error {
 	}
 }
 
-// ClientID != CID
-func (s *Server) newClientID() []byte {
-	var ID []byte
-
-	return ID[:]
-}
-
 func (s *Server) serverHello(incoming *incomingDatagram) {
 	b := make([]byte, datagramMinLen)
 	copy(b[1:33], s.publicKeyBytes)
@@ -125,13 +118,12 @@ func (s *Server) serverHello(incoming *incomingDatagram) {
 	}
 
 	rand.Reader.Read(b[81:93])
-	aead.Seal(b[:33], b[81:93], s.newClientID(), b[:33])
+	aead.Seal(b[:33], b[81:93], newCID(), b[:33])
 	// error b serverHello
 	_, err = s.transport.write(b, incoming.rAddr)
 }
 
 func (s *Server) decodeClientHello2(incoming *incomingDatagram) bool {
-	// ClientID != CID
 	return true
 }
 
@@ -163,9 +155,8 @@ func (s *Server) coreBeginInProcess(c *core, incoming *incomingDatagram) {
 }
 
 func (s *Server) coreInProcess(core *core, incoming *incomingDatagram) {
-	// ClientID != CID
-	if core.cid.ID1 != incoming.cid.ID1 || core.cid.ID2 != incoming.cid.ID2 ||
-		core.cid.ID3 != incoming.cid.ID3 || core.cid.ID4 != incoming.cid.ID4 {
+	if core.cID.ID1 != incoming.cID.ID1 || core.cID.ID2 != incoming.cID.ID2 ||
+		core.cID.ID3 != incoming.cID.ID3 || core.cID.ID4 != incoming.cID.ID4 {
 		core.next.inData <- incoming
 	} else if incoming.cipherB[0]&0b01000000 == 0 {
 		coreInProcess(core, incoming)

@@ -17,14 +17,14 @@ type incomingDatagram struct {
 	next    *incomingDatagram
 	cipherB []byte
 	b       []byte
-	cid     *id
+	cID     *id
 	err     error
 	n       int
 	offset  int
 }
 
 func (d *incomingDatagram) prepareCID() {
-	d.cid = &id{
+	d.cID = &id{
 		ID1: binary.BigEndian.Uint64(d.cipherB[1:9]),
 		ID2: binary.BigEndian.Uint64(d.cipherB[9:17]),
 		ID3: binary.BigEndian.Uint64(d.cipherB[17:25]),
@@ -60,7 +60,8 @@ type core struct {
 	lastIncoming *incomingDatagram
 	incoming     *incomingDatagram
 	outgoing     *outgoingDatagram
-	cid          *id
+	cID          *id
+	contactCID   *id
 	aead         cipher.AEAD
 	isProcess    bool
 }
@@ -140,6 +141,12 @@ func (t *transport) write(b []byte, addr *net.UDPAddr) (int, error) {
 
 func (t *transport) read(b []byte) (int, *net.UDPAddr, error) {
 	return t.conn.ReadFromUDP(b)
+}
+
+func newCID() []byte {
+	var ID []byte
+
+	return ID[:]
 }
 
 func newCounter() *counter {
