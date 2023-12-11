@@ -7,8 +7,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"net"
-
-	"github.com/oleh-malakan/go-node/internal"
 )
 
 func New(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
@@ -56,8 +54,8 @@ func (s *Server) Run(connectionsLimit int) error {
 	}
 	s.publicKeyBytes = s.privateKey.PublicKey().Bytes()
 
-	inData := make(chan *datagram)
-	go s.process(inData, connectionsLimit)
+	in := make(chan *datagram)
+	go s.process(in, connectionsLimit)
 
 	for {
 		i := &datagram{
@@ -68,42 +66,27 @@ func (s *Server) Run(connectionsLimit int) error {
 
 			//continue
 		}
-		inData <- i
+		in <- i
 	}
 }
 
-func (s *Server) process(inData chan *datagram, connectionsLimit int) {
-	var connectionsCount int
-	memory := &internal.IndexArray[core]{}
-	cidManager := &internal.CIDManager{}
-	drop := make(chan int)
+func (s *Server) process(in chan *datagram, connectionsLimit int) {
+	controller := &controller{
+		connectionsLimit: connectionsLimit,
+		counter:          newCounter(),
+		drop:             make(chan int),
+	}
+	go controller.counter.process()
 	for {
 		select {
-		case i := <-inData:
+		case i := <-in:
 			if i.b[0] != 0 {
-				cIDDatagram := parseCIDDatagram(i)
-				if c := memory.Get(cIDDatagram.index); c != nil && c.checkCID(cIDDatagram.cid) {
-					c.inData <- i
-				} else {
-					if connectionsCount < connectionsLimit && cidManager.Put(cIDDatagram.cid) {
-						new := &core{
-							inData:       make(chan *datagram),
-							drop:         drop,
-							isProcess:    true,
-							incoming:     i,
-							lastIncoming: i,
-						}
-						new.index = memory.Put(new)
-						go new.process()
-						connectionsCount++
-					}
-				}
+				controller.in(i)
 			} else {
-				s.serverHello(i, cidManager.CID())
+				s.serverHello(i, controller.cid())
 			}
-		case i := <-drop:
-			memory.Free(i)
-			connectionsCount--
+		case i := <-controller.drop:
+			controller.free(i)
 		}
 	}
 }

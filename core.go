@@ -3,6 +3,8 @@ package node
 import (
 	"crypto/cipher"
 	"net"
+
+	"github.com/oleh-malakan/go-node/internal"
 )
 
 const (
@@ -25,7 +27,7 @@ type datagram struct {
 type cIDDatagram struct {
 	datagram *datagram
 	cid      []byte
-	index    int // index < 0 ClientHello2
+	index    int // if index < 0 ClientHello2
 }
 
 func parseCIDDatagram(d *datagram) *cIDDatagram {
@@ -51,7 +53,7 @@ func (c *core) checkCID(cid []byte) bool {
 
 func (c *core) process() {
 	// send core.index
-	
+
 	for c.isProcess {
 		select {
 		case <-c.inData:
@@ -102,3 +104,71 @@ func (t *transport) write(b []byte, addr *net.UDPAddr) (int, error) {
 func (t *transport) read(b []byte) (int, *net.UDPAddr, error) {
 	return t.conn.ReadFromUDP(b)
 }
+
+type controller struct {
+	memory           *internal.IndexArray[core]
+	drop             chan int
+	counter          *counter
+	connectionsLimit int
+}
+
+func (c *controller) in(incoming *datagram) {
+	cIDDatagram := parseCIDDatagram(incoming)
+	if current := c.memory.Get(cIDDatagram.index); current != nil && current.checkCID(cIDDatagram.cid) {
+		current.inData <- incoming
+	} else {
+		if <-c.counter.value < c.connectionsLimit {
+			c.counter.inc <- nil
+
+			go func() {
+
+				new := &core{
+					inData:       make(chan *datagram),
+					drop:         c.drop,
+					isProcess:    true,
+					incoming:     incoming,
+					lastIncoming: incoming,
+				}
+				new.index = c.memory.Put(new)
+				go new.process()
+			}()
+		}
+	}
+}
+
+func (c *controller) cid() []byte {
+	return []byte{}
+}
+
+func (c *controller) free(index int) {
+	c.memory.Free(index)
+	c.counter.dec <- nil
+}
+
+func newCounter() *counter {
+	return &counter{
+		inc:   make(chan *struct{}),
+		dec:   make(chan *struct{}),
+		value: make(chan int),
+	}
+}
+
+type counter struct {
+	inc   chan *struct{}
+	dec   chan *struct{}
+	value chan int
+	v     int
+}
+
+func (c *counter) process() {
+	for {
+		select {
+		case <-c.inc:
+			c.v++
+		case <-c.dec:
+			c.v--
+		case c.value <- c.v:
+		}
+	}
+}
+

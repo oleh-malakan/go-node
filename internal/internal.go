@@ -32,6 +32,6 @@ func (c *CIDManager) Put(cid []byte) bool {
 	return true
 }
 
-func (i *IndexArray[T]) Free(index int) {
+func (i *CIDManager) Free(index int) {
 
 }
