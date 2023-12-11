@@ -17,6 +17,6 @@ func (i *IndexArray[T]) Put(v *T) (index int64) {
 	return
 }
 
-func (i *IndexArray[T]) Free(index int) {
+func (i *IndexArray[T]) Free(index int64) {
 
 }

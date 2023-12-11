@@ -134,7 +134,7 @@ func (c *controller) in(incoming *datagram) {
 }
 
 
-func (c *controller) free(index int) {
+func (c *controller) free(index int64) {
 	c.memory.Free(index)
 	c.counter.dec <- nil
 }
