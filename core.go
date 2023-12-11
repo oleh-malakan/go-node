@@ -2,6 +2,7 @@ package node
 
 import (
 	"crypto/cipher"
+	"crypto/ecdh"
 	"net"
 
 	"github.com/oleh-malakan/go-node/internal"
@@ -41,6 +42,8 @@ type core struct {
 	drop         chan int
 	lastIncoming *datagram
 	incoming     *datagram
+	privateKey     *ecdh.PrivateKey
+	publicKeyBytes []byte
 	cID          []byte
 	index        int
 	aead         cipher.AEAD

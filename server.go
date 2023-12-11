@@ -19,8 +19,6 @@ func New(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
 type Server struct {
 	address        *net.UDPAddr
 	nodeAddresses  []*net.UDPAddr
-	privateKey     *ecdh.PrivateKey
-	publicKeyBytes []byte
 	transport      *transport
 }
 
