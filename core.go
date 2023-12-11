@@ -25,14 +25,13 @@ type datagram struct {
 	offset int
 }
 
-type cIDDatagram struct {
+type cIndexDatagram struct {
 	datagram *datagram
-	cid      []byte
 	index    int // if index < 0 ClientHello2
 }
 
-func parseCIDDatagram(d *datagram) *cIDDatagram {
-	return &cIDDatagram{
+func parseCIDDatagram(d *datagram) *cIndexDatagram {
+	return &cIndexDatagram{
 		datagram: d,
 	}
 }
@@ -44,14 +43,9 @@ type core struct {
 	incoming     *datagram
 	privateKey     *ecdh.PrivateKey
 	publicKeyBytes []byte
-	cID          []byte
 	index        int
 	aead         cipher.AEAD
 	isProcess    bool
-}
-
-func (c *core) checkCID(cid []byte) bool {
-	return true
 }
 
 func (c *core) process() {
@@ -117,7 +111,7 @@ type controller struct {
 
 func (c *controller) in(incoming *datagram) {
 	cIDDatagram := parseCIDDatagram(incoming)
-	if current := c.memory.Get(cIDDatagram.index); current != nil && current.checkCID(cIDDatagram.cid) {
+	if current := c.memory.Get(cIDDatagram.index); current != nil && current.check() {
 		current.inData <- incoming
 	} else {
 		if <-c.counter.value < c.connectionsLimit {

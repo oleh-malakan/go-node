@@ -19,19 +19,3 @@ func (i *IndexArray[T]) Put(v *T) (index int) {
 func (i *IndexArray[T]) Free(index int) {
 
 }
-
-type CIDManager struct{}
-
-func (c *CIDManager) CID() []byte {
-	var ID []byte
-
-	return ID[:]
-}
-
-func (c *CIDManager) Put(cid []byte) bool {
-	return true
-}
-
-func (i *CIDManager) Free(index int) {
-
-}
