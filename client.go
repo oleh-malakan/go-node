@@ -33,28 +33,15 @@ func (c *Client) process() {
 
 	}
 
-	currentCore := &core{
-		inData:         make(chan *incomingDatagram),
-		drop:           make(chan *core, 1),
-		isProcess:      true,
-		inProcess:      coreInProcess,
-		destroyProcess: coreDestroyProcess,
-	}
-	endCore := &core{
-		inData:         make(chan *incomingDatagram),
-		drop:           make(chan *core),
-		isProcess:      true,
-		inProcess:      coreEndInProcess,
-		destroyProcess: coreDestroyProcess,
+	core := &core{
+		inData:    make(chan *datagram),
+		isProcess: true,
 	}
 
-	currentCore.next = endCore
-
-	go currentCore.process()
-	go endCore.process()
+	go core.process()
 
 	for {
-		i := &incomingDatagram{
+		i := &datagram{
 			b: make([]byte, 1432),
 		}
 		i.n, i.rAddr, i.err = conn.ReadFromUDP(i.b)
@@ -62,6 +49,6 @@ func (c *Client) process() {
 
 			//continue
 		}
-		currentCore.inData <- i
+		core.inData <- i
 	}
 }

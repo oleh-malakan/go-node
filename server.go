@@ -7,12 +7,13 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"net"
+
+	"github.com/oleh-malakan/go-node/internal"
 )
 
 func New(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
 	return &Server{
 		nodeAddresses: nodeAddresses,
-		clientCounter: newCounter(),
 		transport:     &transport{},
 	}, nil
 }
@@ -23,8 +24,6 @@ type Server struct {
 	privateKey     *ecdh.PrivateKey
 	publicKeyBytes []byte
 	transport      *transport
-	clientCounter  *counter
-	clientsLimit   int
 }
 
 func (s *Server) Handler(nodeID string, f func(stream *Stream)) (*Handler, error) {
@@ -40,11 +39,10 @@ func (s *Server) Listen(nodeID string) (*Listener, error) {
 }
 
 // clientsLimit default value 524288 if 0
-func (s *Server) Run(clientsLimit int) error {
-	if clientsLimit <= 0 {
-		clientsLimit = 524288
+func (s *Server) Run(connectionsLimit int) error {
+	if connectionsLimit <= 0 {
+		connectionsLimit = 524288
 	}
-	s.clientsLimit = clientsLimit
 
 	var err error
 	s.transport.conn, err = net.ListenUDP("udp", s.address)
@@ -58,46 +56,63 @@ func (s *Server) Run(clientsLimit int) error {
 	}
 	s.publicKeyBytes = s.privateKey.PublicKey().Bytes()
 
-	go s.clientCounter.process()
-
-	beginCore := &core{
-		inData:         make(chan *incomingDatagram),
-		drop:           make(chan *core, 1),
-		isProcess:      true,
-		inProcess:      s.coreBeginInProcess,
-		destroyProcess: coreDestroyProcess,
-	}
-	endCore := &core{
-		inData:         make(chan *incomingDatagram),
-		drop:           make(chan *core),
-		isProcess:      true,
-		inProcess:      s.coreEndInProcess,
-		destroyProcess: coreDestroyProcess,
-	}
-	beginCore.next = endCore
-	endCore.next = beginCore
-
-	go beginCore.process()
-	go endCore.process()
+	inData := make(chan *datagram)
+	go s.process(inData, connectionsLimit)
 
 	for {
-		i := &incomingDatagram{
-			cipherB: make([]byte, 1432),
+		i := &datagram{
+			b: make([]byte, 1432),
 		}
-		i.n, i.rAddr, i.err = s.transport.read(i.cipherB)
+		i.n, i.rAddr, i.err = s.transport.read(i.b)
 		if i.err != nil {
 
 			//continue
 		}
-		beginCore.inData <- i
+		inData <- i
 	}
 }
 
-func (s *Server) serverHello(incoming *incomingDatagram) {
+func (s *Server) process(inData chan *datagram, connectionsLimit int) {
+	var connectionsCount int
+	memory := &internal.IndexArray[core]{}
+	cidManager := &internal.CIDManager{}
+	drop := make(chan int)
+	for {
+		select {
+		case i := <-inData:
+			if i.b[0] != 0 {
+				cIDDatagram := parseCIDDatagram(i)
+				if c := memory.Get(cIDDatagram.index); c != nil && c.checkCID(cIDDatagram.cid) {
+					c.inData <- i
+				} else {
+					if connectionsCount < connectionsLimit && cidManager.Put(cIDDatagram.cid) {
+						new := &core{
+							inData:       make(chan *datagram),
+							drop:         drop,
+							isProcess:    true,
+							incoming:     i,
+							lastIncoming: i,
+						}
+						new.index = memory.Put(new)
+						go new.process()
+						connectionsCount++
+					}
+				}
+			} else {
+				s.serverHello(i, cidManager.CID())
+			}
+		case i := <-drop:
+			memory.Free(i)
+			connectionsCount--
+		}
+	}
+}
+
+func (s *Server) serverHello(incoming *datagram, cid []byte) {
 	b := make([]byte, datagramMinLen)
 	copy(b[1:33], s.publicKeyBytes)
 
-	rKey, err := ecdh.P256().NewPublicKey(incoming.cipherB[1:33])
+	rKey, err := ecdh.P256().NewPublicKey(incoming.b[1:33])
 	if err != nil {
 		return
 	}
@@ -118,61 +133,9 @@ func (s *Server) serverHello(incoming *incomingDatagram) {
 	}
 
 	rand.Reader.Read(b[81:93])
-	aead.Seal(b[:33], b[81:93], newCID(), b[:33])
+	aead.Seal(b[:33], b[81:93], cid, b[:33])
 	// error b serverHello
 	_, err = s.transport.write(b, incoming.rAddr)
-}
-
-func (s *Server) decodeClientHello2(incoming *incomingDatagram) bool {
-	return true
-}
-
-func (s *Server) coreBeginInProcess(c *core, incoming *incomingDatagram) {
-	if incoming.cipherB[0]&0b10000000 != 0 {
-		if incoming.b == nil {
-			incoming.prepareCID()
-			c.next.inData <- incoming
-		} else {
-			if <-s.clientCounter.value <= s.clientsLimit {
-				new := &core{
-					inData:         make(chan *incomingDatagram),
-					drop:           make(chan *core),
-					isProcess:      true,
-					inProcess:      s.coreInProcess,
-					destroyProcess: s.coreDestroyProcess,
-					next:           c.next,
-					incoming:       incoming,
-					lastIncoming:   incoming,
-				}
-				c.next = new
-				go new.process()
-				s.clientCounter.inc <- nil
-			}
-		}
-	} else {
-		s.serverHello(incoming)
-	}
-}
-
-func (s *Server) coreInProcess(core *core, incoming *incomingDatagram) {
-	if core.cID.ID1 != incoming.cID.ID1 || core.cID.ID2 != incoming.cID.ID2 ||
-		core.cID.ID3 != incoming.cID.ID3 || core.cID.ID4 != incoming.cID.ID4 {
-		core.next.inData <- incoming
-	} else if incoming.cipherB[0]&0b01000000 == 0 {
-		coreInProcess(core, incoming)
-	}
-}
-
-func (s *Server) coreEndInProcess(core *core, incoming *incomingDatagram) {
-	if incoming.cipherB[0]&0b01000000 != 0 {
-		if s.decodeClientHello2(incoming) {
-			core.next.inData <- incoming
-		}
-	}
-}
-
-func (s *Server) coreDestroyProcess() {
-	s.clientCounter.dec <- nil
 }
 
 func (s *Server) Close() error {

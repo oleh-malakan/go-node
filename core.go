@@ -2,7 +2,6 @@ package node
 
 import (
 	"crypto/cipher"
-	"encoding/binary"
 	"net"
 )
 
@@ -12,91 +11,53 @@ const (
 	dataCap        = 1416
 )
 
-type incomingDatagram struct {
-	rAddr   *net.UDPAddr
-	next    *incomingDatagram
-	cipherB []byte
-	b       []byte
-	cID     *id
-	err     error
-	n       int
-	offset  int
-}
-
-func (d *incomingDatagram) prepareCID() {
-	d.cID = &id{
-		ID1: binary.BigEndian.Uint64(d.cipherB[1:9]),
-		ID2: binary.BigEndian.Uint64(d.cipherB[9:17]),
-		ID3: binary.BigEndian.Uint64(d.cipherB[17:25]),
-		ID4: binary.BigEndian.Uint64(d.cipherB[25:33]),
-	}
-}
-
-func (d *incomingDatagram) decode() bool {
-	return true
-}
-
-type outgoingDatagram struct {
-	prev   *outgoingDatagram
+type datagram struct {
+	rAddr  *net.UDPAddr
+	next   *datagram
 	b      []byte
+	data   []byte
+	err    error
 	n      int
+	begin  int
 	offset int
 }
 
-type id struct {
-	ID1 uint64
-	ID2 uint64
-	ID3 uint64
-	ID4 uint64
+type cIDDatagram struct {
+	datagram *datagram
+	cid      []byte
+	index    int // index < 0 ClientHello2
+}
+
+func parseCIDDatagram(d *datagram) *cIDDatagram {
+	return &cIDDatagram{
+		datagram: d,
+	}
 }
 
 type core struct {
-	next           *core
-	drop           chan *core
-	inProcess      func(core *core, incoming *incomingDatagram)
-	destroyProcess func()
-
-	inData       chan *incomingDatagram
-	lastIncoming *incomingDatagram
-	incoming     *incomingDatagram
-	outgoing     *outgoingDatagram
-	cID          *id
+	inData       chan *datagram
+	drop         chan int
+	lastIncoming *datagram
+	incoming     *datagram
+	cID          []byte
+	index        int
 	aead         cipher.AEAD
 	isProcess    bool
 }
 
+func (c *core) checkCID(cid []byte) bool {
+	return true
+}
+
 func (c *core) process() {
+	// send core.index
+	
 	for c.isProcess {
 		select {
-		case i := <-c.inData:
-			c.inProcess(c, i)
-		case d := <-c.next.drop:
-			c.next = d.next
-		}
-	}
-
-	c.destroyProcess()
-	for {
-		select {
-		case i := <-c.inData:
-			c.next.inData <- i
-		case c.drop <- c:
-			return
+		case <-c.inData:
 		}
 	}
 }
-
-func coreInProcess(core *core, incoming *incomingDatagram) {
-	if incoming.decode() {
-
-		//
-
-	}
-}
-
-func coreEndInProcess(core *core, incoming *incomingDatagram) {}
-
-func coreDestroyProcess() {}
 
 type Stream struct{}
 
@@ -140,37 +101,4 @@ func (t *transport) write(b []byte, addr *net.UDPAddr) (int, error) {
 
 func (t *transport) read(b []byte) (int, *net.UDPAddr, error) {
 	return t.conn.ReadFromUDP(b)
-}
-
-func newCID() []byte {
-	var ID []byte
-
-	return ID[:]
-}
-
-func newCounter() *counter {
-	return &counter{
-		inc:   make(chan *struct{}),
-		dec:   make(chan *struct{}),
-		value: make(chan int),
-	}
-}
-
-type counter struct {
-	inc   chan *struct{}
-	dec   chan *struct{}
-	value chan int
-	v     int
-}
-
-func (c *counter) process() {
-	for {
-		select {
-		case <-c.inc:
-			c.v++
-		case <-c.dec:
-			c.v--
-		case c.value <- c.v:
-		}
-	}
 }
