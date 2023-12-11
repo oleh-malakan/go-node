@@ -111,7 +111,7 @@ type controller struct {
 
 func (c *controller) in(incoming *datagram) {
 	cIDDatagram := parseCIDDatagram(incoming)
-	if current := c.memory.Get(int(cIDDatagram.cid)); current != nil && current.check() {
+	if current := c.memory.Get(cIDDatagram.cid); current != nil && current.check() {
 		current.inData <- incoming
 	} else {
 		if <-c.counter.value < c.connectionsLimit {
