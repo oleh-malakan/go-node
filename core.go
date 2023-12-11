@@ -27,7 +27,7 @@ type datagram struct {
 
 type cIDDatagram struct {
 	datagram *datagram
-	cid      int
+	cid      int64
 }
 
 func parseCIDDatagram(d *datagram) *cIDDatagram {
@@ -43,7 +43,7 @@ type core struct {
 	incoming       *datagram
 	privateKey     *ecdh.PrivateKey
 	publicKeyBytes []byte
-	cid            int
+	cid            int64
 	aead           cipher.AEAD
 	isProcess      bool
 }
@@ -111,7 +111,7 @@ type controller struct {
 
 func (c *controller) in(incoming *datagram) {
 	cIDDatagram := parseCIDDatagram(incoming)
-	if current := c.memory.Get(cIDDatagram.cid); current != nil && current.check() {
+	if current := c.memory.Get(int(cIDDatagram.cid)); current != nil && current.check() {
 		current.inData <- incoming
 	} else {
 		if <-c.counter.value < c.connectionsLimit {
