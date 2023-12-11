@@ -25,27 +25,27 @@ type datagram struct {
 	offset int
 }
 
-type cIndexDatagram struct {
+type cIDDatagram struct {
 	datagram *datagram
-	index    int // if index < 0 ClientHello2
+	cid      int
 }
 
-func parseCIDDatagram(d *datagram) *cIndexDatagram {
-	return &cIndexDatagram{
+func parseCIDDatagram(d *datagram) *cIDDatagram {
+	return &cIDDatagram{
 		datagram: d,
 	}
 }
 
 type core struct {
-	inData       chan *datagram
-	drop         chan int
-	lastIncoming *datagram
-	incoming     *datagram
+	inData         chan *datagram
+	drop           chan int
+	lastIncoming   *datagram
+	incoming       *datagram
 	privateKey     *ecdh.PrivateKey
 	publicKeyBytes []byte
-	index        int
-	aead         cipher.AEAD
-	isProcess    bool
+	cid            int
+	aead           cipher.AEAD
+	isProcess      bool
 }
 
 func (c *core) process() {
@@ -111,7 +111,7 @@ type controller struct {
 
 func (c *controller) in(incoming *datagram) {
 	cIDDatagram := parseCIDDatagram(incoming)
-	if current := c.memory.Get(cIDDatagram.index); current != nil && current.check() {
+	if current := c.memory.Get(cIDDatagram.cid); current != nil && current.check() {
 		current.inData <- incoming
 	} else {
 		if <-c.counter.value < c.connectionsLimit {
@@ -126,16 +126,13 @@ func (c *controller) in(incoming *datagram) {
 					incoming:     incoming,
 					lastIncoming: incoming,
 				}
-				new.index = c.memory.Put(new)
+				new.cid = c.memory.Put(new)
 				go new.process()
 			}()
 		}
 	}
 }
 
-func (c *controller) cid() []byte {
-	return []byte{}
-}
 
 func (c *controller) free(index int) {
 	c.memory.Free(index)
@@ -168,4 +165,3 @@ func (c *counter) process() {
 		}
 	}
 }
-
