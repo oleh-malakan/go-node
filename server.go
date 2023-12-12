@@ -6,6 +6,7 @@ import (
 	"crypto/ecdh"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/binary"
 	"net"
 )
 
@@ -17,9 +18,9 @@ func New(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
 }
 
 type Server struct {
-	address        *net.UDPAddr
-	nodeAddresses  []*net.UDPAddr
-	transport      *transport
+	address       *net.UDPAddr
+	nodeAddresses []*net.UDPAddr
+	transport     *transport
 }
 
 func (s *Server) Handler(nodeID string, f func(stream *Stream)) (*Handler, error) {
@@ -46,12 +47,6 @@ func (s *Server) Run(connectionsLimit int) error {
 		return err
 	}
 
-	s.privateKey, err = ecdh.X25519().GenerateKey(rand.Reader)
-	if err != nil {
-		return err
-	}
-	s.publicKeyBytes = s.privateKey.PublicKey().Bytes()
-
 	in := make(chan *datagram)
 	go s.process(in, connectionsLimit)
 
@@ -69,54 +64,73 @@ func (s *Server) Run(connectionsLimit int) error {
 }
 
 func (s *Server) process(in chan *datagram, connectionsLimit int) {
-	controller := &controller{
-		connectionsLimit: connectionsLimit,
-		counter:          newCounter(),
-		drop:             make(chan int),
-	}
-	go controller.counter.process()
+	var connectionCount int
+	memory := &indexArray[core]{}
+	drop := make(chan int64)
 	for {
 		select {
 		case i := <-in:
 			if i.b[0] != 0 {
-				controller.in(i)
+				cIDDatagram := parseCIDDatagram(i)
+				if current := memory.get(cIDDatagram.cid); current != nil {
+					current.inData <- cIDDatagram.datagram
+				}
 			} else {
-				s.serverHello(i, controller.cid())
+				if connectionCount < connectionsLimit && len(i.b) >= datagramMinLen {
+					privateKey, err := ecdh.X25519().GenerateKey(rand.Reader)
+					if err != nil {
+						continue
+					}
+					remotePublicKey, err := ecdh.X25519().NewPublicKey(i.b[1:33])
+					if err != nil {
+						continue
+					}
+					secret, err := privateKey.ECDH(remotePublicKey)
+					if err != nil {
+						continue
+					}
+					block, err := aes.NewCipher(secret)
+					if err != nil {
+						continue
+					}
+
+					i.did = int64(binary.BigEndian.Uint64(i.b[25:33]))
+					i.begin = i.n
+					new := &core{
+						inData:       make(chan *datagram),
+						drop:         drop,
+						isProcess:    true,
+						incoming:     i,
+						lastIncoming: i,
+					}
+					new.aead, err = cipher.NewGCM(block)
+					if err != nil {
+						continue
+					}
+					new.cid = memory.put(new)
+
+					b := make([]byte, datagramMinLen)
+					copy(b[1:33], privateKey.PublicKey().Bytes())
+					rand.Reader.Read(b[57:69])
+					var cidB []byte
+					cidB = binary.BigEndian.AppendUint64(cidB, uint64(new.cid))
+
+					new.aead.Seal(b[:33], b[57:69], cidB, b[:33])
+					_, err = s.transport.write(b, i.rAddr)
+					if err != nil {
+						memory.free(new.cid)
+						continue
+					}
+
+					go new.process()
+					connectionCount++
+				}
 			}
-		case i := <-controller.drop:
-			controller.free(i)
+		case i := <-drop:
+			memory.free(i)
+			connectionCount--
 		}
 	}
-}
-
-func (s *Server) serverHello(incoming *datagram, cid []byte) {
-	b := make([]byte, datagramMinLen)
-	copy(b[1:33], s.publicKeyBytes)
-
-	rKey, err := ecdh.P256().NewPublicKey(incoming.b[1:33])
-	if err != nil {
-		return
-	}
-
-	secret, err := s.privateKey.ECDH(rKey)
-	if err != nil {
-		return
-	}
-
-	block, err := aes.NewCipher(secret)
-	if err != nil {
-		return
-	}
-
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		return
-	}
-
-	rand.Reader.Read(b[81:93])
-	aead.Seal(b[:33], b[81:93], cid, b[:33])
-	// error b serverHello
-	_, err = s.transport.write(b, incoming.rAddr)
 }
 
 func (s *Server) Close() error {
