@@ -8,6 +8,8 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"net"
+
+	"github.com/oleh-malakan/go-node/ia"
 )
 
 func New(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
@@ -65,14 +67,14 @@ func (s *Server) Run(connectionsLimit int) error {
 
 func (s *Server) process(in chan *datagram, connectionsLimit int) {
 	var connectionCount int
-	memory := &indexArray[core]{}
+	memory := &ia.IndexArray[core]{}
 	drop := make(chan int64)
 	for {
 		select {
 		case i := <-in:
 			if i.b[0] != 0 {
 				cIDDatagram := parseCIDDatagram(i)
-				if current := memory.get(cIDDatagram.cid); current != nil {
+				if current := memory.Get(cIDDatagram.cid); current != nil {
 					current.inData <- cIDDatagram.datagram
 				}
 			} else {
@@ -107,7 +109,7 @@ func (s *Server) process(in chan *datagram, connectionsLimit int) {
 					if err != nil {
 						continue
 					}
-					new.cid = memory.put(new)
+					new.cid = memory.Put(new)
 
 					b := make([]byte, datagramMinLen)
 					copy(b[1:33], privateKey.PublicKey().Bytes())
@@ -118,7 +120,7 @@ func (s *Server) process(in chan *datagram, connectionsLimit int) {
 					new.aead.Seal(b[:33], b[57:69], cidB, b[:33])
 					_, err = s.transport.write(b, i.rAddr)
 					if err != nil {
-						memory.free(new.cid)
+						memory.Free(new.cid)
 						continue
 					}
 
@@ -127,7 +129,7 @@ func (s *Server) process(in chan *datagram, connectionsLimit int) {
 				}
 			}
 		case i := <-drop:
-			memory.free(i)
+			memory.Free(i)
 			connectionCount--
 		}
 	}

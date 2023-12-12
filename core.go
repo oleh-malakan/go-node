@@ -95,24 +95,3 @@ func (t *transport) write(b []byte, addr *net.UDPAddr) (int, error) {
 func (t *transport) read(b []byte) (int, *net.UDPAddr, error) {
 	return t.conn.ReadFromUDP(b)
 }
-
-type indexArray[T any] struct {
-	array []*T
-}
-
-func (i *indexArray[T]) get(index int64) *T {
-	platformIndex := int(index)
-	if platformIndex >= 0 && platformIndex < len(i.array) {
-		return i.array[platformIndex]
-	}
-
-	return nil
-}
-
-func (i *indexArray[T]) put(v *T) (index int64) {
-	return
-}
-
-func (i *indexArray[T]) free(index int64) {
-
-}
