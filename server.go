@@ -9,7 +9,7 @@ import (
 	"encoding/binary"
 	"net"
 
-	"github.com/oleh-malakan/go-node/ia"
+	"github.com/oleh-malakan/go-node/memory"
 )
 
 func New(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
@@ -37,10 +37,10 @@ func (s *Server) Listen(nodeID string) (*Listener, error) {
 	}, nil
 }
 
-// clientsLimit default value 524288 if 0
+// connectionsLimit default value 1000000 if 0, max value 1000000000
 func (s *Server) Run(connectionsLimit int) error {
-	if connectionsLimit <= 0 {
-		connectionsLimit = 524288
+	if connectionsLimit <= 0 || connectionsLimit > 1000000000 {
+		connectionsLimit = 1000000
 	}
 
 	var err error
@@ -67,8 +67,8 @@ func (s *Server) Run(connectionsLimit int) error {
 
 func (s *Server) process(in chan *datagram, connectionsLimit int) {
 	var connectionCount int
-	memory := &ia.IndexArray[core]{}
-	drop := make(chan int64)
+	memory := &memory.Memory[core]{}
+	drop := make(chan *core)
 	for {
 		select {
 		case i := <-in:
@@ -109,15 +109,15 @@ func (s *Server) process(in chan *datagram, connectionsLimit int) {
 					if err != nil {
 						continue
 					}
-					new.cid = memory.Put(new)
+					new.cid, _ = memory.Put(new)
 
 					b := make([]byte, datagramMinLen)
 					copy(b[1:33], privateKey.PublicKey().Bytes())
-					rand.Reader.Read(b[57:69])
-					var cidB []byte
-					cidB = binary.BigEndian.AppendUint64(cidB, uint64(new.cid))
+					rand.Reader.Read(b[53:65])
 
-					new.aead.Seal(b[:33], b[57:69], cidB, b[:33])
+					binary.BigEndian.PutUint32(b[33:], uint32(new.cid))
+
+					new.aead.Seal(b[:33], b[55:67], b[33:37], b[:33])
 					_, err = s.transport.write(b, i.rAddr)
 					if err != nil {
 						memory.Free(new.cid)
@@ -128,8 +128,8 @@ func (s *Server) process(in chan *datagram, connectionsLimit int) {
 					connectionCount++
 				}
 			}
-		case i := <-drop:
-			memory.Free(i)
+		case core := <-drop:
+			memory.Free(core.cid)
 			connectionCount--
 		}
 	}

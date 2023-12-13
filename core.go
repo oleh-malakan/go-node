@@ -25,7 +25,7 @@ type datagram struct {
 
 type cIDDatagram struct {
 	datagram *datagram
-	cid      int64
+	cid      int32
 }
 
 func parseCIDDatagram(d *datagram) *cIDDatagram {
@@ -36,10 +36,10 @@ func parseCIDDatagram(d *datagram) *cIDDatagram {
 
 type core struct {
 	inData       chan *datagram
-	drop         chan int64
+	drop         chan *core
 	lastIncoming *datagram
 	incoming     *datagram
-	cid          int64
+	cid          int32
 	aead         cipher.AEAD
 	isProcess    bool
 }
