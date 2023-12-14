@@ -70,7 +70,9 @@ func (m *Memory[T]) Free(index int32) {
 				m.column[column].free = m.column[column].free[:lenRow]
 			}
 			if int(m.column[column].lenFree) == len(m.column[column].row) {
-				m.column = m.column[:len(m.column)-1]
+				m.column[column].row = nil
+				m.column[column].free = nil
+				m.column[column].lenFree = 0
 			}
 		}
 	}
