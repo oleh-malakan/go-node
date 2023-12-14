@@ -7,8 +7,8 @@ const (
 
 type column[T any] struct {
 	row     []*T
-	free    []int
-	lenFree int
+	free    []int32
+	lenFree int32
 }
 
 var EOF = &errorEOF{}
@@ -21,7 +21,7 @@ func (m *Memory[T]) Put(v *T) (int32, error) {
 	for i, column := range m.column {
 		if column.lenFree > 0 {
 			column.lenFree--
-			j := column.free[column.lenFree]
+			j := int(column.free[column.lenFree])
 			column.row[j] = v
 			return int32(i*rowCap + j), nil
 		} else {
@@ -35,7 +35,7 @@ func (m *Memory[T]) Put(v *T) (int32, error) {
 	if i := len(m.column); i < columnCap {
 		m.column = append(m.column, &column[T]{
 			row:  []*T{v},
-			free: []int{0},
+			free: []int32{0},
 		})
 		return int32(i * rowCap), nil
 	}
@@ -61,9 +61,9 @@ func (m *Memory[T]) Free(index int32) {
 	if column < len(m.column) {
 		if row < len(m.column[column].row) && m.column[column].row[row] != nil {
 			m.column[column].row[row] = nil
-			m.column[column].free[m.column[column].lenFree] = row
+			m.column[column].free[m.column[column].lenFree] = int32(row)
 			m.column[column].lenFree++
-			if m.column[column].lenFree == len(m.column[column].row) {
+			if int(m.column[column].lenFree) == len(m.column[column].row) {
 				m.column[column].row = nil
 				m.column[column].free = nil
 				m.column[column].lenFree = 0
