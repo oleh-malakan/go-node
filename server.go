@@ -12,11 +12,19 @@ import (
 	"github.com/oleh-malakan/go-node/memory"
 )
 
-func New(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
+func NewServer(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
 	return &Server{
 		nodeAddresses: nodeAddresses,
 		transport:     &transport{},
 	}, nil
+}
+
+func NewServerPrivateHello(privateKey []byte, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (server *Server, publicKey []byte, err error) {
+	return &Server{}, []byte{}, nil
+}
+
+func GeneratePrivateKey() ([]byte, error) {
+	return []byte{}, nil
 }
 
 type Server struct {

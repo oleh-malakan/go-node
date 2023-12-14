@@ -5,7 +5,7 @@ import (
 	"net"
 )
 
-func Dial(nodeAddresses ...*net.UDPAddr) (*Client, error) {
+func NewClient(nodeAddresses ...*net.UDPAddr) (*Client, error) {
 	if len(nodeAddresses) == 0 {
 		return nil, errors.New("node address not specified")
 	}
@@ -17,6 +17,10 @@ func Dial(nodeAddresses ...*net.UDPAddr) (*Client, error) {
 	go client.process()
 
 	return client, nil
+}
+
+func NewClientPrivateHello(publicKey []byte, nodeAddresses ...*net.UDPAddr) (*Client, error) {
+	return &Client{}, nil
 }
 
 type Client struct {

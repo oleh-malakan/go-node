@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	server, err := node.New(&net.UDPAddr{})
+	server, err := node.NewServer(&net.UDPAddr{})
 	if err != nil {
 		log.Fatal(err)
 	}
