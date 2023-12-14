@@ -15,6 +15,7 @@ var EOF = &errorEOF{}
 
 type Memory[T any] struct {
 	column []*column[T]
+	cursor int
 }
 
 func (m *Memory[T]) Put(v *T) (int32, error) {
@@ -59,14 +60,17 @@ func (m *Memory[T]) Free(index int32) {
 	column := int(index / rowCap)
 	row := int(index % rowCap)
 	if column < len(m.column) {
-		if row < len(m.column[column].row) && m.column[column].row[row] != nil {
-			m.column[column].row[row] = nil
-			m.column[column].free[m.column[column].lenFree] = int32(row)
-			m.column[column].lenFree++
+		if lenRow := len(m.column[column].row); row < lenRow && m.column[column].row[row] != nil {
+			if lenRow--; row < lenRow {
+				m.column[column].row[row] = nil
+				m.column[column].free[m.column[column].lenFree] = int32(row)
+				m.column[column].lenFree++
+			} else {
+				m.column[column].row = m.column[column].row[:lenRow]
+				m.column[column].free = m.column[column].free[:lenRow]
+			}
 			if int(m.column[column].lenFree) == len(m.column[column].row) {
-				m.column[column].row = nil
-				m.column[column].free = nil
-				m.column[column].lenFree = 0
+				m.column = m.column[:len(m.column)-1]
 			}
 		}
 	}

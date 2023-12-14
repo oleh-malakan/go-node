@@ -68,6 +68,9 @@ func TestMemory(t *testing.T) {
 	m.Free(t7.index)
 	m.Free(t3.index)
 
+	m.Free(t9.index)
+	m.Free(t8.index)
+
 	t3.index, _ = m.Put(t3)
 	t2.index, _ = m.Put(t2)
 	t7.index, _ = m.Put(t7)
