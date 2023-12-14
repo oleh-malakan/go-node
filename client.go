@@ -1,11 +1,39 @@
 package node
 
 import (
+	"crypto/ecdh"
 	"errors"
 	"net"
 )
 
 func NewClient(nodeAddresses ...*net.UDPAddr) (*Client, error) {
+	client, err := newClient(nodeAddresses...)
+	if err != nil {
+		return nil, err
+	}
+
+	go client.process()
+
+	return client, nil
+}
+
+func NewClientPrivateHello(serverPublicKey []byte, nodeAddresses ...*net.UDPAddr) (*Client, error) {
+	client, err := newClient(nodeAddresses...)
+	if err != nil {
+		return nil, err
+	}
+
+	client.serverPublicKey, err = ecdh.X25519().NewPublicKey(serverPublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	go client.process()
+
+	return client, nil
+}
+
+func newClient(nodeAddresses ...*net.UDPAddr) (*Client, error) {
 	if len(nodeAddresses) == 0 {
 		return nil, errors.New("node address not specified")
 	}
@@ -14,17 +42,12 @@ func NewClient(nodeAddresses ...*net.UDPAddr) (*Client, error) {
 		nodeAddresses: nodeAddresses,
 	}
 
-	go client.process()
-
 	return client, nil
 }
 
-func NewClientPrivateHello(publicKey []byte, nodeAddresses ...*net.UDPAddr) (*Client, error) {
-	return &Client{}, nil
-}
-
 type Client struct {
-	nodeAddresses []*net.UDPAddr
+	nodeAddresses   []*net.UDPAddr
+	serverPublicKey *ecdh.PublicKey
 }
 
 func (c *Client) Connect(nodeID string) (*Stream, error) {

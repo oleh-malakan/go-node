@@ -14,23 +14,40 @@ import (
 
 func NewServer(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
 	return &Server{
+		address:       address,
 		nodeAddresses: nodeAddresses,
 		transport:     &transport{},
 	}, nil
 }
 
-func NewServerPrivateHello(privateKey []byte, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (server *Server, publicKey []byte, err error) {
-	return &Server{}, []byte{}, nil
+func NewServerPrivateHello(serverPrivateKey []byte, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (server *Server, serverPublicKey []byte, err error) {
+	server, err = NewServer(address, nodeAddresses...)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	server.privateKey, err = ecdh.X25519().NewPrivateKey(serverPrivateKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return server, server.privateKey.PublicKey().Bytes(), nil
 }
 
-func GeneratePrivateKey() ([]byte, error) {
-	return []byte{}, nil
+func GenerateServerPrivateKey() ([]byte, error) {
+	key, err := ecdh.X25519().GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	return key.Bytes(), nil
 }
 
 type Server struct {
 	address       *net.UDPAddr
 	nodeAddresses []*net.UDPAddr
 	transport     *transport
+	privateKey    *ecdh.PrivateKey
 }
 
 func (s *Server) Handler(nodeID string, f func(stream *Stream)) (*Handler, error) {
@@ -45,10 +62,10 @@ func (s *Server) Listen(nodeID string) (*Listener, error) {
 	}, nil
 }
 
-// connectionsLimit default value 1000000 if 0, max value 1000000000
+// connectionsLimit default value 1000000 if 0, max value 1000000000 0 - 15gb
 func (s *Server) Run(connectionsLimit int) error {
 	if connectionsLimit <= 0 || connectionsLimit > 1000000000 {
-		connectionsLimit = 1000000
+		connectionsLimit = 1000000 // 0 - 15mb
 	}
 
 	var err error

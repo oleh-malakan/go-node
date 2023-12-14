@@ -18,27 +18,24 @@ type Memory[T any] struct {
 }
 
 func (m *Memory[T]) Put(v *T) (int32, error) {
-	// debug
 	for i, column := range m.column {
-		// debug
 		if column.lenFree > 0 {
 			column.lenFree--
 			j := column.free[column.lenFree]
 			column.row[j] = v
-			column.free[column.lenFree] = 0
 			return int32(i*rowCap + j), nil
 		} else {
-			// debug
 			if j := len(column.row); j < rowCap {
 				column.row = append(column.row, v)
+				column.free = append(column.free, 0)
 				return int32(i*rowCap + j), nil
 			}
 		}
 	}
-	// debug
 	if i := len(m.column); i < columnCap {
 		m.column = append(m.column, &column[T]{
-			row: []*T{v},
+			row:  []*T{v},
+			free: []int{0},
 		})
 		return int32(i * rowCap), nil
 	}
@@ -62,16 +59,14 @@ func (m *Memory[T]) Free(index int32) {
 	column := int(index / rowCap)
 	row := int(index % rowCap)
 	if column < len(m.column) {
-		if row < len(m.column[column].row) {
+		if row < len(m.column[column].row) && m.column[column].row[row] != nil {
 			m.column[column].row[row] = nil
+			m.column[column].free[m.column[column].lenFree] = row
 			m.column[column].lenFree++
-			// debug
-			if m.column[column].lenFree < len(m.column[column].free) {
-				// debug
-				m.column[column].free[m.column[column].lenFree] = row
-			} else {
-				// debug
-				m.column[column].free = append(m.column[column].free, row)
+			if m.column[column].lenFree == len(m.column[column].row) {
+				m.column[column].row = nil
+				m.column[column].free = nil
+				m.column[column].lenFree = 0
 			}
 		}
 	}
