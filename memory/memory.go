@@ -35,7 +35,6 @@ func (m *Memory[T]) Get(index int32) *T {
 	x := xy % cap
 	y := xy / cap
 	z := int(index / zDivider)
-	return m.memory.cont.array[z].page.cont.array[y].array[x]
 
 	return nil
 }
