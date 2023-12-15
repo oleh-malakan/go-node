@@ -6,11 +6,12 @@ import (
 )
 
 func TestMemory(t *testing.T) {
-	index := 9999999
-	row := index % rowCap
-	column := index / rowCap
-	index = column*rowCap + row
-	fmt.Println(row, column, index)
+	index := 1871032
+	xy := index % zDivider
+	x := xy % cap
+	y := xy / cap
+	z := index / zDivider
+	fmt.Println(x, y, z, index)
 
 	type test struct {
 		value int
@@ -31,7 +32,6 @@ func TestMemory(t *testing.T) {
 
 	m.Free(t0.index)
 	t0.index, _ = m.Put(t0)
-
 
 	t1 := &test{value: 1}
 	t1.index, _ = m.Put(t1)
