@@ -12,7 +12,7 @@ import (
 	"github.com/oleh-malakan/go-node/memory"
 )
 
-func NewServer(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
+func New(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
 	return &Server{
 		address:       address,
 		nodeAddresses: nodeAddresses,
@@ -20,34 +20,10 @@ func NewServer(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, er
 	}, nil
 }
 
-func NewServerPrivateHello(serverPrivateKey []byte, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (server *Server, serverPublicKey []byte, err error) {
-	server, err = NewServer(address, nodeAddresses...)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	server.privateKey, err = ecdh.X25519().NewPrivateKey(serverPrivateKey)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return server, server.privateKey.PublicKey().Bytes(), nil
-}
-
-func GenerateServerPrivateKey() ([]byte, error) {
-	key, err := ecdh.X25519().GenerateKey(rand.Reader)
-	if err != nil {
-		return nil, err
-	}
-
-	return key.Bytes(), nil
-}
-
 type Server struct {
 	address       *net.UDPAddr
 	nodeAddresses []*net.UDPAddr
 	transport     *transport
-	privateKey    *ecdh.PrivateKey
 }
 
 func (s *Server) Handler(nodeID string, f func(stream *Stream)) (*Handler, error) {

@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	client, err := node.NewClient(&net.UDPAddr{})
+	client, err := node.Dial(&net.UDPAddr{})
 	if err != nil {
 		log.Fatal(err)
 	}
