@@ -6,34 +6,7 @@ import (
 	"net"
 )
 
-func NewClient(nodeAddresses ...*net.UDPAddr) (*Client, error) {
-	client, err := newClient(nodeAddresses...)
-	if err != nil {
-		return nil, err
-	}
-
-	go client.process()
-
-	return client, nil
-}
-
-func NewClientPrivateHello(serverPublicKey []byte, nodeAddresses ...*net.UDPAddr) (*Client, error) {
-	client, err := newClient(nodeAddresses...)
-	if err != nil {
-		return nil, err
-	}
-
-	client.serverPublicKey, err = ecdh.X25519().NewPublicKey(serverPublicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	go client.process()
-
-	return client, nil
-}
-
-func newClient(nodeAddresses ...*net.UDPAddr) (*Client, error) {
+func Dial(nodeAddresses ...*net.UDPAddr) (*Client, error) {
 	if len(nodeAddresses) == 0 {
 		return nil, errors.New("node address not specified")
 	}
@@ -41,6 +14,8 @@ func newClient(nodeAddresses ...*net.UDPAddr) (*Client, error) {
 	client := &Client{
 		nodeAddresses: nodeAddresses,
 	}
+
+	go client.process()
 
 	return client, nil
 }
