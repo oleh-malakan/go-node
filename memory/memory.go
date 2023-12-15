@@ -11,14 +11,18 @@ type indexArray[T any] struct {
 	lenFree int32
 }
 
+type continer[T any] struct {
+	cont *indexArray[T]
+}
+
 type page[T any] struct {
-	page *indexArray[*indexArray[*T]]
+	page *continer[*indexArray[*T]]
 }
 
 var EOF = &errorEOF{}
 
 type Memory[T any] struct {
-	memory *indexArray[*page[T]]
+	memory *continer[*page[T]]
 }
 
 func (m *Memory[T]) Put(v *T) (int32, error) {
@@ -31,6 +35,7 @@ func (m *Memory[T]) Get(index int32) *T {
 	x := xy % cap
 	y := xy / cap
 	z := int(index / zDivider)
+	return m.memory.cont.array[z].page.cont.array[y].array[x]
 
 	return nil
 }
