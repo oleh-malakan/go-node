@@ -38,10 +38,13 @@ func (s *Server) Listen(nodeID string) (*Listener, error) {
 	}, nil
 }
 
-// connectionsLimit default value 1000000 if 0, max value 1000000000 0 - 15gb
+// connectionsLimit default value 1000000 if 0, max value 1000000000
 func (s *Server) Run(connectionsLimit int) error {
-	if connectionsLimit <= 0 || connectionsLimit > 1000000000 {
-		connectionsLimit = 1000000 // 0 - 15mb
+	if connectionsLimit <= 0 {
+		connectionsLimit = 1000000
+	}
+	if connectionsLimit > 1000000000 {
+		connectionsLimit = 1000000000
 	}
 
 	var err error
@@ -110,7 +113,7 @@ func (s *Server) process(in chan *datagram, connectionsLimit int) {
 					if err != nil {
 						continue
 					}
-					new.cid, _ = memory.Put(new)
+					new.cid = memory.Put(new)
 
 					b := make([]byte, datagramMinLen)
 					copy(b[1:33], privateKey.PublicKey().Bytes())
