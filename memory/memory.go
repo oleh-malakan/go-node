@@ -5,22 +5,22 @@ const (
 	depth = 1000000
 )
 
-type indexArray[T any] struct {
+type indexVector[T any] struct {
 	array     []*T
 	indexFree []int16
 	lenFree   int16
 }
 
-func (a *indexArray[T]) put(v *T) int16 {
-	if v != nil {
-		if a.lenFree > 0 {
-			a.lenFree--
-			index := a.indexFree[a.lenFree]
-			a.array[index] = v
+func (v *indexVector[T]) put(value *T) int16 {
+	if value != nil {
+		if v.lenFree > 0 {
+			v.lenFree--
+			index := v.indexFree[v.lenFree]
+			v.array[index] = value
 			return index
-		} else if index := int16(len(a.array)); index < cap {
-			a.array = append(a.array, v)
-			a.indexFree = append(a.indexFree, 0)
+		} else if index := int16(len(v.array)); index < cap {
+			v.array = append(v.array, value)
+			v.indexFree = append(v.indexFree, 0)
 			return index
 		}
 	}
@@ -28,45 +28,77 @@ func (a *indexArray[T]) put(v *T) int16 {
 	return -1
 }
 
-func (a *indexArray[T]) get(index int16) *T {
-	if int(index) < len(a.array) {
-		return a.array[index]
+func (v *indexVector[T]) get(index int16) *T {
+	if int(index) < len(v.array) {
+		return v.array[index]
 	}
 
 	return nil
 }
 
-func (a *indexArray[T]) free(index int16) {
-	if lenArray := len(a.array); int(index) < lenArray && a.array[index] != nil {
+func (v *indexVector[T]) free(index int16) {
+	if lenArray := len(v.array); int(index) < lenArray && v.array[index] != nil {
 		if lenArray--; int(index) < lenArray {
-			a.array[index] = nil
-			a.indexFree[a.lenFree] = index
-			a.lenFree++
+			v.array[index] = nil
+			v.indexFree[v.lenFree] = index
+			v.lenFree++
 		} else {
-			a.array = a.array[:lenArray]
-			a.indexFree = a.indexFree[:lenArray]
+			v.array = v.array[:lenArray]
+			v.indexFree = v.indexFree[:lenArray]
 		}
-		if int(a.lenFree) == len(a.array) {
-			a.array = nil
-			a.indexFree = nil
-			a.lenFree = 0
+		if int(v.lenFree) == len(v.array) {
+			v.array = nil
+			v.indexFree = nil
+			v.lenFree = 0
 		}
 	}
 }
 
-type orderContainer[T any] struct {
-	array []*T
+func (v *indexVector[T]) len() int16 {
+	return int16(len(v.array))
+}
+
+type orderVector[T any] struct {
+	array     []*T
+	indexFree []int16
+}
+
+func (v *orderVector[T]) put(value *T) int16 {
+	if value != nil {
+		if len(v.indexFree) > 0 {
+
+		} else {
+
+		}
+	}
+
+	return -1
+}
+
+func (v *orderVector[T]) get(index int16) *T {
+	if int(index) < len(v.array) {
+		return v.array[index]
+	}
+
+	return nil
+}
+
+func (v *orderVector[T]) free(index int16) {
+}
+
+func (v *orderVector[T]) len() int16 {
+	return int16(len(v.array))
 }
 
 type page[T any] struct {
-	p *orderContainer[*indexArray[T]]
+	p *orderVector[*indexVector[T]]
 }
 
-func (p *page[T]) open() (int16, *indexArray[T]) {
+func (p *page[T]) open() (int16, *indexVector[T]) {
 	return 0, nil
 }
 
-func (p *page[T]) get(index int16) *indexArray[T] {
+func (p *page[T]) get(index int16) *indexVector[T] {
 	return nil
 }
 
@@ -75,7 +107,7 @@ func (p *page[T]) free(index int16) {
 }
 
 type bank[T any] struct {
-	b *orderContainer[*page[T]]
+	b *orderVector[*page[T]]
 }
 
 func (b *bank[T]) open() (int16, *page[T]) {

@@ -19,7 +19,7 @@ func TestMemory(t *testing.T) {
 		index int16
 	}
 
-	a := &indexArray[test]{}
+	a := &indexVector[test]{}
 
 	var err error
 	t0 := &test{value: 0}
