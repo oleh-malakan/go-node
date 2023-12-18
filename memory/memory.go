@@ -4,7 +4,7 @@ const (
 	cap   = 1000
 	depth = 1000000
 )
-
+/*
 type orderVector[T any] struct {
 	array     []*T
 	indexFree []int16
@@ -56,7 +56,7 @@ func (v *orderVector[T]) free(index int) {
 func (v *orderVector[T]) len() int {
 	return len(v.array)
 }
-
+*/
 type column[T any] struct {
 	array     []*T
 	indexFree []int16
@@ -111,7 +111,9 @@ func (c *column[T]) len() int {
 }
 
 type page[T any] struct {
-	vector *orderVector[column[T]]
+//	vector *orderVector[column[T]]
+	array []*column[T]
+	indexFree []int16
 	cursor int16
 }
 
@@ -120,7 +122,7 @@ func (p *page[T]) open() (int, *column[T]) {
 	if p.cursor > 0 {
 		cursor = int(p.cursor)
 	}
-
+/*
 	for i := cursor; i < p.vector.len(); i++ {
 		if column := p.vector.get(i); column != nil && column.len() < cap {
 			return i, column
@@ -131,7 +133,7 @@ func (p *page[T]) open() (int, *column[T]) {
 		column := &column[T]{}
 		return p.vector.put(column), column
 	}
-
+*/
 	return 0, nil
 }
 
@@ -144,11 +146,13 @@ func (p *page[T]) free(index int) {
 }
 
 func (p *page[T]) len() int {
-	return p.vector.len()
+//	return p.vector.len()
 }
 
 type bank[T any] struct {
-	vector *orderVector[page[T]]
+//	vector *orderVector[page[T]]
+	array []*page[T]
+	indexFree []int16
 	cursor int16
 }
 
@@ -157,7 +161,7 @@ func (b *bank[T]) open() (int, *page[T]) {
 	if b.cursor > 0 {
 		cursor = int(b.cursor)
 	}
-
+/*
 	for i := cursor; i < b.vector.len(); i++ {
 		if page := b.vector.get(i); page != nil && page.len() < cap {
 			return i, page
@@ -168,7 +172,7 @@ func (b *bank[T]) open() (int, *page[T]) {
 		page := &page[T]{}
 		return b.vector.put(page), page
 	}
-
+*/
 	return 0, nil
 }
 
