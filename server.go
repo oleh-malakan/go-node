@@ -79,6 +79,10 @@ func (s *Server) process(in chan *datagram, connectionsLimit int) {
 			if i.b[0] != 0 {
 				cIDDatagram := parseCIDDatagram(i)
 				if current := memory.Get(cIDDatagram.cid); current != nil {
+					if current.isProcess {
+						current.resume()
+						go current.process()
+					}
 					current.inData <- cIDDatagram.datagram
 				}
 			} else {
@@ -109,7 +113,7 @@ func (s *Server) process(in chan *datagram, connectionsLimit int) {
 						incoming:     i,
 						lastIncoming: i,
 					}
-					new.aead, err = cipher.NewGCM(block)
+					new.cipher, err = cipher.NewGCM(block)
 					if err != nil {
 						continue
 					}
@@ -121,7 +125,7 @@ func (s *Server) process(in chan *datagram, connectionsLimit int) {
 
 					binary.BigEndian.PutUint32(b[33:], uint32(new.cid))
 
-					new.aead.Seal(b[:33], b[55:67], b[33:37], b[:33])
+					new.cipher.Seal(b[:33], b[55:67], b[33:37], b[:33])
 					_, err = s.transport.write(b, i.rAddr)
 					if err != nil {
 						memory.Free(new.cid)

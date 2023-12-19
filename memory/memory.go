@@ -1,212 +1,66 @@
 package memory
 
 const (
-	cap   = 1000
-	depth = 1000000
+	capRow    = 1000000
+	capColumn = 1000
 )
-/*
-type orderVector[T any] struct {
-	array     []*T
-	indexFree []int16
-}
 
-func (v *orderVector[T]) put(value *T) int {
-	if value != nil {
-		if len(v.indexFree) > 0 {
-			index := v.indexFree[0]
-			v.indexFree = v.indexFree[1:]
-			v.array[index] = value
-			return int(index)
-		} else if index := len(v.array); index < cap {
-			v.array = append(v.array, value)
-			return index
-		}
-	}
-
-	return -1
-}
-
-func (v *orderVector[T]) get(index int) *T {
-	if index < len(v.array) {
-		return v.array[index]
-	}
-
-	return nil
-}
-
-func (v *orderVector[T]) free(index int) {
-	if index < len(v.array) && v.array[index] != nil {
-		v.array[index] = nil
-		for i := 0; i < len(v.indexFree); i++ {
-			if index < int(v.indexFree[i]) {
-				temp := v.indexFree[i]
-				v.indexFree[i] = int16(index)
-				index = int(temp)
-			}
-		}
-		v.indexFree = append(v.indexFree, int16(index))
-
-		for len(v.indexFree) > 0 && int(v.indexFree[len(v.indexFree)-1]) == len(v.array)-1 {
-			v.array = v.array[:len(v.array)-1]
-			v.indexFree = v.indexFree[:len(v.indexFree)-1]
-		}
-	}
-}
-
-func (v *orderVector[T]) len() int {
-	return len(v.array)
-}
-*/
 type column[T any] struct {
-	array     []*T
-	indexFree []int16
-	lenFree   int16
-}
-
-func (c *column[T]) put(value *T) int {
-	if value != nil {
-		if c.lenFree > 0 {
-			c.lenFree--
-			index := c.indexFree[c.lenFree]
-			c.array[index] = value
-			return int(index)
-		} else if index := len(c.array); index < cap {
-			c.array = append(c.array, value)
-			c.indexFree = append(c.indexFree, 0)
-			return index
-		}
-	}
-
-	return -1
-}
-
-func (c *column[T]) get(index int) *T {
-	if index < len(c.array) {
-		return c.array[index]
-	}
-
-	return nil
-}
-
-func (c *column[T]) free(index int) {
-	if lenArray := len(c.array); index < lenArray && c.array[index] != nil {
-		if lenArray--; int(index) < lenArray {
-			c.array[index] = nil
-			c.indexFree[c.lenFree] = int16(index)
-			c.lenFree++
-		} else {
-			c.array = c.array[:lenArray]
-			c.indexFree = c.indexFree[:lenArray]
-		}
-		if int(c.lenFree) == len(c.array) {
-			c.array = nil
-			c.indexFree = nil
-			c.lenFree = 0
-		}
-	}
-}
-
-func (c *column[T]) len() int {
-	return len(c.array)
-}
-
-type page[T any] struct {
-//	vector *orderVector[column[T]]
-	array []*column[T]
-	indexFree []int16
-	cursor int16
-}
-
-func (p *page[T]) open() (int, *column[T]) {
-	var cursor int
-	if p.cursor > 0 {
-		cursor = int(p.cursor)
-	}
-/*
-	for i := cursor; i < p.vector.len(); i++ {
-		if column := p.vector.get(i); column != nil && column.len() < cap {
-			return i, column
-		}
-	}
-
-	if p.vector.len() < cap {
-		column := &column[T]{}
-		return p.vector.put(column), column
-	}
-*/
-	return 0, nil
-}
-
-func (p *page[T]) get(index int) *column[T] {
-	return nil
-}
-
-func (p *page[T]) free(index int) {
-
-}
-
-func (p *page[T]) len() int {
-//	return p.vector.len()
-}
-
-type bank[T any] struct {
-//	vector *orderVector[page[T]]
-	array []*page[T]
-	indexFree []int16
-	cursor int16
-}
-
-func (b *bank[T]) open() (int, *page[T]) {
-	var cursor int
-	if b.cursor > 0 {
-		cursor = int(b.cursor)
-	}
-/*
-	for i := cursor; i < b.vector.len(); i++ {
-		if page := b.vector.get(i); page != nil && page.len() < cap {
-			return i, page
-		}
-	}
-
-	if b.vector.len() < cap {
-		page := &page[T]{}
-		return b.vector.put(page), page
-	}
-*/
-	return 0, nil
-}
-
-func (b *bank[T]) get(index int) *page[T] {
-	return nil
-}
-
-func (b *bank[T]) free(index int) {
-
+	row       []*T
+	indexFree []int32
+	lenFree   int
 }
 
 type Memory[T any] struct {
-	bank *bank[T]
+	column    []*column[T]
+	indexFree []int16
+	cursor    int
 }
 
 func (m *Memory[T]) Put(v *T) int32 {
-	if z, page := m.bank.open(); page != nil {
-		if y, column := page.open(); column != nil {
-			return int32(int(z)*depth + int(y)*cap + int(column.put(v)))
+	for m.cursor < len(m.column) {
+		if m.column[m.cursor] != nil && len(m.column[m.cursor].row) < capColumn {
+			if m.column[m.cursor].lenFree > 0 {
+				m.column[m.cursor].lenFree--
+				i := m.column[m.cursor].indexFree[m.column[m.cursor].lenFree]
+				m.column[m.cursor].row[i] = v
+				return int32(m.cursor*capRow) + i
+			} else {
+				if i := len(m.column[m.cursor].row); i < capRow {
+					m.column[m.cursor].row = append(m.column[m.cursor].row, v)
+					m.column[m.cursor].indexFree = append(m.column[m.cursor].indexFree, 0)
+					return int32(m.cursor*capRow + i)
+				}
+			}
 		}
+		m.cursor++
+	}
+
+	if m.cursor < capColumn {
+		if len(m.indexFree) > 0 {
+			m.cursor = int(m.indexFree[0])
+			m.indexFree = m.indexFree[1:]
+			m.column[m.cursor] = &column[T]{
+				row:       []*T{v},
+				indexFree: []int32{0},
+			}
+		} else if m.cursor = len(m.column); m.cursor < capColumn {
+			m.column = append(m.column, &column[T]{
+				row:       []*T{v},
+				indexFree: []int32{0},
+			})
+		}
+
+		return int32(int(m.cursor) * capRow)
 	}
 
 	return -1
 }
 
 func (m *Memory[T]) Get(index int32) *T {
-	xy := int(index % depth)
-	x := xy % cap
-	y := xy / cap
-	z := int(index / depth)
-
-	if page := m.bank.get(z); page != nil {
-		if column := page.get(y); column != nil {
-			return column.get(x)
+	if j := int(index / capRow); j < len(m.column) && m.column[j] != nil {
+		if i := int(index % capRow); i < len(m.column[j].row) {
+			return m.column[j].row[i]
 		}
 	}
 
@@ -214,4 +68,34 @@ func (m *Memory[T]) Get(index int32) *T {
 }
 
 func (m *Memory[T]) Free(index int32) {
+	if j := int(index / capRow); j < len(m.column) && m.column[j] != nil {
+		lenRow := len(m.column[j].row)
+		if i := int(index % capRow); i < lenRow && m.column[j].row[i] != nil {
+			if lenRow--; i < lenRow {
+				m.column[j].row[i] = nil
+				m.column[j].indexFree[m.column[j].lenFree] = int32(i)
+				m.column[j].lenFree++
+			} else {
+				m.column[j].row = m.column[j].row[:lenRow]
+				m.column[j].indexFree = m.column[j].indexFree[:lenRow]
+			}
+
+			if m.column[j].lenFree == len(m.column[j].row) {
+				m.column[j] = nil
+				for k := 0; k < len(m.indexFree); k++ {
+					if j < int(m.indexFree[k]) {
+						temp := m.indexFree[k]
+						m.indexFree[k] = int16(j)
+						j = int(temp)
+					}
+				}
+				m.indexFree = append(m.indexFree, int16(j))
+
+				for len(m.indexFree) > 0 && int(m.indexFree[len(m.indexFree)-1]) == len(m.column)-1 {
+					m.column = m.column[:len(m.column)-1]
+					m.indexFree = m.indexFree[:len(m.indexFree)-1]
+				}
+			}
+		}
+	}
 }
