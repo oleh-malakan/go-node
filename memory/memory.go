@@ -18,40 +18,42 @@ type Memory[T any] struct {
 }
 
 func (m *Memory[T]) Put(v *T) int32 {
-	for m.cursor < len(m.column) {
-		if m.column[m.cursor] != nil && len(m.column[m.cursor].row) < capColumn {
-			if m.column[m.cursor].lenFree > 0 {
-				m.column[m.cursor].lenFree--
-				i := m.column[m.cursor].indexFree[m.column[m.cursor].lenFree]
-				m.column[m.cursor].row[i] = v
-				return int32(m.cursor*capRow) + i
-			} else {
-				if i := len(m.column[m.cursor].row); i < capRow {
-					m.column[m.cursor].row = append(m.column[m.cursor].row, v)
-					m.column[m.cursor].indexFree = append(m.column[m.cursor].indexFree, 0)
-					return int32(m.cursor*capRow + i)
+	if v != nil {
+		for m.cursor < len(m.column) {
+			if m.column[m.cursor] != nil && len(m.column[m.cursor].row) < capColumn {
+				if m.column[m.cursor].lenFree > 0 {
+					m.column[m.cursor].lenFree--
+					i := m.column[m.cursor].indexFree[m.column[m.cursor].lenFree]
+					m.column[m.cursor].row[i] = v
+					return int32(m.cursor*capRow) + i
+				} else {
+					if i := len(m.column[m.cursor].row); i < capRow {
+						m.column[m.cursor].row = append(m.column[m.cursor].row, v)
+						m.column[m.cursor].indexFree = append(m.column[m.cursor].indexFree, 0)
+						return int32(m.cursor*capRow + i)
+					}
 				}
 			}
+			m.cursor++
 		}
-		m.cursor++
-	}
 
-	if m.cursor < capColumn {
-		if len(m.indexFree) > 0 {
-			m.cursor = int(m.indexFree[0])
-			m.indexFree = m.indexFree[1:]
-			m.column[m.cursor] = &column[T]{
-				row:       []*T{v},
-				indexFree: []int32{0},
+		if m.cursor < capColumn {
+			if len(m.indexFree) > 0 {
+				m.cursor = int(m.indexFree[0])
+				m.indexFree = m.indexFree[1:]
+				m.column[m.cursor] = &column[T]{
+					row:       []*T{v},
+					indexFree: []int32{0},
+				}
+			} else if m.cursor = len(m.column); m.cursor < capColumn {
+				m.column = append(m.column, &column[T]{
+					row:       []*T{v},
+					indexFree: []int32{0},
+				})
 			}
-		} else if m.cursor = len(m.column); m.cursor < capColumn {
-			m.column = append(m.column, &column[T]{
-				row:       []*T{v},
-				indexFree: []int32{0},
-			})
-		}
 
-		return int32(int(m.cursor) * capRow)
+			return int32(int(m.cursor) * capRow)
+		}
 	}
 
 	return -1
