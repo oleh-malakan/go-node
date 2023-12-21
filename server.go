@@ -38,10 +38,10 @@ func (s *Server) Listen(nodeID string) (*Listener, error) {
 	}, nil
 }
 
-// connectionsLimit default value 1000000 if 0, max value 1000000000
+// connectionsLimit default value 2000000 if 0, max value 1000000000
 func (s *Server) Run(connectionsLimit int) error {
 	if connectionsLimit <= 0 {
-		connectionsLimit = 1000000
+		connectionsLimit = 2000000
 	}
 	if connectionsLimit > 1000000000 {
 		connectionsLimit = 1000000000
@@ -70,7 +70,6 @@ func (s *Server) Run(connectionsLimit int) error {
 }
 
 func (s *Server) process(in chan *datagram, connectionsLimit int) {
-	var connectionCount int
 	memory := &memory.Memory[core]{}
 	drop := make(chan *core)
 	for {
@@ -79,14 +78,10 @@ func (s *Server) process(in chan *datagram, connectionsLimit int) {
 			if i.b[0] != 0 {
 				cIDDatagram := parseCIDDatagram(i)
 				if current := memory.Get(cIDDatagram.cid); current != nil {
-					if current.isProcess {
-						current.resume()
-						go current.process()
-					}
 					current.inData <- cIDDatagram.datagram
 				}
 			} else {
-				if connectionCount < connectionsLimit && len(i.b) >= datagramMinLen {
+				if len(i.b) >= datagramMinLen && memory.Len() < connectionsLimit {
 					privateKey, err := ecdh.X25519().GenerateKey(rand.Reader)
 					if err != nil {
 						continue
@@ -133,12 +128,10 @@ func (s *Server) process(in chan *datagram, connectionsLimit int) {
 					}
 
 					go new.process()
-					connectionCount++
 				}
 			}
 		case core := <-drop:
 			memory.Free(core.cid)
-			connectionCount--
 		}
 	}
 }

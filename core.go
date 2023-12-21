@@ -35,17 +35,13 @@ func parseCIDDatagram(d *datagram) *cIDDatagram {
 }
 
 type core struct {
-	secret       []byte
-	cipher       cipher.AEAD
 	inData       chan *datagram
 	drop         chan *core
 	lastIncoming *datagram
 	incoming     *datagram
+	cipher       cipher.AEAD
 	cid          int32
 	isProcess    bool
-}
-
-func (c *core) resume() {
 }
 
 func (c *core) process() {
