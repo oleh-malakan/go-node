@@ -22,7 +22,7 @@ func (m *Memory[T]) Put(v *T) int32 {
 	if v != nil {
 		m.len++
 		for m.cursor < len(m.column) {
-			if m.column[m.cursor] != nil && len(m.column[m.cursor].row) < capColumn {
+			if m.column[m.cursor] != nil && len(m.column[m.cursor].row) < capRow {
 				if m.column[m.cursor].lenFree > 0 {
 					m.column[m.cursor].lenFree--
 					i := m.column[m.cursor].indexFree[m.column[m.cursor].lenFree]
@@ -32,32 +32,27 @@ func (m *Memory[T]) Put(v *T) int32 {
 					m.column[m.cursor].row = append(m.column[m.cursor].row, v)
 					m.column[m.cursor].indexFree = append(m.column[m.cursor].indexFree, 0)
 					return int32(m.cursor*capRow + i)
-				} else {
-					//
 				}
 			}
 			m.cursor++
 		}
 
-		if m.cursor < capColumn {
-			if len(m.indexFree) > 0 {
-				m.cursor = int(m.indexFree[0])
-				m.indexFree = m.indexFree[1:]
-				m.column[m.cursor] = &column[T]{
-					row:       []*T{v},
-					indexFree: []int32{0},
-				}
-			} else if m.cursor = len(m.column); m.cursor < capColumn {
-				m.column = append(m.column, &column[T]{
-					row:       []*T{v},
-					indexFree: []int32{0},
-				})
-			} else {
-				//
+		if len(m.indexFree) > 0 {
+			m.cursor = int(m.indexFree[0])
+			m.indexFree = m.indexFree[1:]
+			m.column[m.cursor] = &column[T]{
+				row:       []*T{v},
+				indexFree: []int32{0},
 			}
-
-			return int32(int(m.cursor) * capRow)
+			return int32(m.cursor * capRow)
+		} else if m.cursor < capColumn {
+			m.column = append(m.column, &column[T]{
+				row:       []*T{v},
+				indexFree: []int32{0},
+			})
+			return int32(m.cursor * capRow)
 		}
+
 		m.len--
 	}
 
