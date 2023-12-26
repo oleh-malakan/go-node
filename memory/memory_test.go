@@ -11,62 +11,62 @@ type test struct {
 }
 
 func TestMemory(t *testing.T) {
-	c := &Memory[test]{}
+	m := &Memory[test]{}
 
 	t0 := &test{value: 0}
-	t0.index = c.Put(t0)
+	t0.index = m.Put(t0)
 
-	c.Free(t0.index)
-	t0.index = c.Put(t0)
+	m.Free(t0.index)
+	t0.index = m.Put(t0)
 
-	c.Free(t0.index)
-	t0.index = c.Put(t0)
+	m.Free(t0.index)
+	t0.index = m.Put(t0)
 
 	t1 := &test{value: 1}
-	t1.index = c.Put(t1)
+	t1.index = m.Put(t1)
 	t2 := &test{value: 2}
-	t2.index = c.Put(t2)
+	t2.index = m.Put(t2)
 
-	c.Free(t1.index)
-	c.Free(t1.index)
-	c.Free(t0.index)
-	c.Free(t2.index)
-	t0.index = c.Put(t0)
-	t1.index = c.Put(t1)
-	t2.index = c.Put(t2)
+	m.Free(t1.index)
+	m.Free(t1.index)
+	m.Free(t0.index)
+	m.Free(t2.index)
+	t0.index = m.Put(t0)
+	t1.index = m.Put(t1)
+	t2.index = m.Put(t2)
 
 	t3 := &test{value: 3}
-	t3.index = c.Put(t3)
+	t3.index = m.Put(t3)
 	t4 := &test{value: 4}
-	t4.index = c.Put(t4)
+	t4.index = m.Put(t4)
 	t5 := &test{value: 5}
-	t5.index = c.Put(t5)
+	t5.index = m.Put(t5)
 	t6 := &test{value: 6}
-	t6.index = c.Put(t6)
+	t6.index = m.Put(t6)
 	t7 := &test{value: 7}
-	t7.index = c.Put(t7)
+	t7.index = m.Put(t7)
 	t8 := &test{value: 8}
-	t8.index = c.Put(t8)
+	t8.index = m.Put(t8)
 	t9 := &test{value: 9}
-	t9.index = c.Put(t9)
+	t9.index = m.Put(t9)
 
-	c.Free(t1.index)
-	t1.index = c.Put(t1)
+	m.Free(t1.index)
+	t1.index = m.Put(t1)
 
-	c.Free(t2.index)
-	c.Free(t7.index)
-	c.Free(t3.index)
+	m.Free(t2.index)
+	m.Free(t7.index)
+	m.Free(t3.index)
 
-	c.Free(t9.index)
-	c.Free(t8.index)
+	m.Free(t9.index)
+	m.Free(t8.index)
 
-	t3.index = c.Put(t3)
-	t2.index = c.Put(t2)
-	t7.index = c.Put(t7)
+	t3.index = m.Put(t3)
+	t2.index = m.Put(t2)
+	t7.index = m.Put(t7)
 
-	tt := c.Get(t5.index)
+	tt := m.Get(t5.index)
 	fmt.Println(tt)
 
-	tt = c.Get(55)
+	tt = m.Get(55)
 	fmt.Println(tt)
 }

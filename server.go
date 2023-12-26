@@ -112,6 +112,7 @@ func (s *Server) process(in chan *datagram, connectionsLimit int) {
 					if err != nil {
 						continue
 					}
+
 					new.cid = memory.Put(new)
 
 					b := make([]byte, datagramMinLen)

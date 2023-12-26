@@ -12,27 +12,22 @@ type column[T any] struct {
 }
 
 type Memory[T any] struct {
-	column    []*column[T]
-	indexFree []int16
-	cursor    int
-	len       int
+	column     []*column[T]
+	indexFree  []int
+	columnFree *column[T]
+	cursor     int
+	len        int
 }
 
 func (m *Memory[T]) Put(v *T) int32 {
 	if v != nil {
 		m.len++
 		for m.cursor < len(m.column) {
-			if m.column[m.cursor] != nil && len(m.column[m.cursor].row) < capRow {
-				if m.column[m.cursor].lenFree > 0 {
-					m.column[m.cursor].lenFree--
-					i := m.column[m.cursor].indexFree[m.column[m.cursor].lenFree]
-					m.column[m.cursor].row[i] = v
-					return int32(m.cursor*capRow) + i
-				} else if i := len(m.column[m.cursor].row); i < capRow {
-					m.column[m.cursor].row = append(m.column[m.cursor].row, v)
-					m.column[m.cursor].indexFree = append(m.column[m.cursor].indexFree, 0)
-					return int32(m.cursor*capRow + i)
-				}
+			if m.column[m.cursor] != nil && m.column[m.cursor].lenFree > 0 {
+				m.column[m.cursor].lenFree--
+				i := m.column[m.cursor].indexFree[m.column[m.cursor].lenFree]
+				m.column[m.cursor].row[i] = v
+				return int32(m.cursor*capRow) + i
 			}
 			m.cursor++
 		}
@@ -40,17 +35,41 @@ func (m *Memory[T]) Put(v *T) int32 {
 		if len(m.indexFree) > 0 {
 			m.cursor = int(m.indexFree[0])
 			m.indexFree = m.indexFree[1:]
-			m.column[m.cursor] = &column[T]{
-				row:       []*T{v},
-				indexFree: []int32{0},
+			if m.columnFree == nil {
+				m.column[m.cursor] = &column[T]{
+					row:       make([]*T, capRow),
+					indexFree: make([]int32, capRow),
+				}
+				for i := 0; i < capRow; i++ {
+					m.column[m.cursor].indexFree[i] = int32(capRow - i - 1)
+				}
+				m.column[m.cursor].lenFree = capRow
+			} else {
+				m.column[m.cursor] = m.columnFree
+				m.columnFree = nil
 			}
-			return int32(m.cursor * capRow)
+			m.column[m.cursor].lenFree--
+			i := m.column[m.cursor].indexFree[m.column[m.cursor].lenFree]
+			m.column[m.cursor].row[i] = v
+			return int32(m.cursor*capRow) + i
 		} else if m.cursor < capColumn {
-			m.column = append(m.column, &column[T]{
-				row:       []*T{v},
-				indexFree: []int32{0},
-			})
-			return int32(m.cursor * capRow)
+			if m.columnFree == nil {
+				m.column = append(m.column, &column[T]{
+					row:       make([]*T, capRow),
+					indexFree: make([]int32, capRow),
+				})
+				for i := 0; i < capRow; i++ {
+					m.column[m.cursor].indexFree[i] = int32(capRow - i - 1)
+				}
+				m.column[m.cursor].lenFree = capRow
+			} else {
+				m.column = append(m.column, m.columnFree)
+				m.columnFree = nil
+			}
+			m.column[m.cursor].lenFree--
+			i := m.column[m.cursor].indexFree[m.column[m.cursor].lenFree]
+			m.column[m.cursor].row[i] = v
+			return int32(m.cursor*capRow) + i
 		}
 
 		m.len--
@@ -71,32 +90,27 @@ func (m *Memory[T]) Get(index int32) *T {
 
 func (m *Memory[T]) Free(index int32) {
 	if j := int(index / capRow); j < len(m.column) && m.column[j] != nil {
-		lenRow := len(m.column[j].row)
-		if i := int(index % capRow); i < lenRow && m.column[j].row[i] != nil {
+		if i := int(index % capRow); i < capRow && m.column[j].row[i] != nil {
 			if j < m.cursor {
 				m.cursor = j
 			}
 			m.len--
-			if lenRow--; i < lenRow {
-				m.column[j].row[i] = nil
-				m.column[j].indexFree[m.column[j].lenFree] = int32(i)
-				m.column[j].lenFree++
-			} else {
-				m.column[j].row = m.column[j].row[:lenRow]
-				m.column[j].indexFree = m.column[j].indexFree[:lenRow]
-			}
+			m.column[j].row[i] = nil
+			m.column[j].indexFree[m.column[j].lenFree] = int32(i)
+			m.column[j].lenFree++
 
 			if m.column[j].lenFree == len(m.column[j].row) {
+				m.columnFree = m.column[j]
 				m.column[j] = nil
-				//
+
 				for k := 0; k < len(m.indexFree); k++ {
 					if j < int(m.indexFree[k]) {
 						temp := m.indexFree[k]
-						m.indexFree[k] = int16(j)
+						m.indexFree[k] = j
 						j = int(temp)
 					}
 				}
-				m.indexFree = append(m.indexFree, int16(j))
+				m.indexFree = append(m.indexFree, j)
 
 				for len(m.indexFree) > 0 && int(m.indexFree[len(m.indexFree)-1]) == len(m.column)-1 {
 					m.column = m.column[:len(m.column)-1]
