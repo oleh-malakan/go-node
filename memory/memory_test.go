@@ -69,4 +69,44 @@ func TestMemory(t *testing.T) {
 
 	tt = m.Get(55)
 	fmt.Println(tt)
+
+	t9.index = m.Put(t9)
+	t8.index = m.Put(t8)
+
+	t10 := &test{value: 10}
+	t10.index = m.Put(t10)
+
+	m.Free(t10.index)
+	t10.index = m.Put(t10)
+
+	m.Free(t10.index)
+	m.Free(t9.index)
+
+	t10.index = m.Put(t10)
+	t9.index = m.Put(t9)
+
+	m.Free(t10.index)
+	m.Free(t9.index)
+
+	t9.index = m.Put(t9)
+	t10.index = m.Put(t10)
+
+	m.Free(t0.index)
+	m.Free(t1.index)
+	m.Free(t2.index)
+	m.Free(t3.index)
+	m.Free(t4.index)
+	m.Free(t5.index)
+	m.Free(t6.index)
+	m.Free(t7.index)
+	m.Free(t8.index)
+	m.Free(t9.index)
+
+	t9.index = m.Put(t9)
+
+	m.Free(t9.index)
+	m.Free(t10.index)
+
+	t9.index = m.Put(t9)
+
 }
