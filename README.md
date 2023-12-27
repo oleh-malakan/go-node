@@ -1,5 +1,5 @@
 # Go-Node
-Cloud application platform
+Application platform
 * Transport layer UDP 
 * Transport layer security
 * Connection migration
