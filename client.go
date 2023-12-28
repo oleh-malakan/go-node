@@ -29,6 +29,10 @@ func (c *Client) Connect(nodeID string) (*Stream, error) {
 	return &Stream{}, nil
 }
 
+func (c *Client) Close() error {
+	return nil
+}
+
 func (c *Client) process() {
 	conn, err := net.DialUDP("udp", nil, c.nodeAddresses[0])
 	if err != nil {

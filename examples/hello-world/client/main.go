@@ -13,11 +13,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer client.Close()
 
 	stream, err := client.Connect("Hello, World!")
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
+
+		return
 	}
+	defer stream.Close()
 
 	err = stream.Send([]byte("Hello"))
 	if err != nil {
@@ -32,12 +36,6 @@ func main() {
 
 		return
 	}
+	
 	fmt.Println(string(b))
-
-	err = stream.Close()
-	if err != nil {
-		log.Print(err)
-
-		return
-	}
 }

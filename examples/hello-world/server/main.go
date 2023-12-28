@@ -37,12 +37,12 @@ func main() {
 		return
 	}
 
-	message := string(b)
-	if message == "Hello" {
-		if err := stream.Send([]byte(message + ", World!")); err != nil {
-			log.Print(err)
+	b = append(b, []byte(", World!")...)
 
-			return
-		}
+	err = stream.Send(b)
+	if err != nil {
+		log.Print(err)
+
+		return
 	}
 }
