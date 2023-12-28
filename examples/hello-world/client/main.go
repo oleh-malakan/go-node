@@ -36,6 +36,6 @@ func main() {
 
 		return
 	}
-	
+
 	fmt.Println(string(b))
 }
