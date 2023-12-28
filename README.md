@@ -1,5 +1,5 @@
 # Go-Node
-Application platform
+Communication platform 
 * Transport layer UDP 
 * Transport layer security
 * Connection migration

@@ -12,24 +12,35 @@ import (
 	"github.com/oleh-malakan/go-node/memory"
 )
 
-func New(address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
-	return &Server{
+// connectionsLimit default value 2000000 if 0, max value 1000000000
+func Run(connectionsLimit int, address *net.UDPAddr, nodeAddresses ...*net.UDPAddr) (*Server, error) {
+	if connectionsLimit <= 0 {
+		connectionsLimit = 2000000
+	}
+	if connectionsLimit > 1000000000 {
+		connectionsLimit = 1000000000
+	}
+
+	s := &Server{
 		address:       address,
 		nodeAddresses: nodeAddresses,
-		transport:     &transport{},
-	}, nil
+	}
+	var err error
+	s.transport.conn, err = net.ListenUDP("udp", s.address)
+	if err != nil {
+		return nil, err
+	}
+
+	go s.process()
+
+	return s, nil
 }
 
 type Server struct {
-	address       *net.UDPAddr
-	nodeAddresses []*net.UDPAddr
-	transport     *transport
-}
-
-func (s *Server) Handler(nodeID string, f func(stream *Stream)) (*Handler, error) {
-	return &Handler{
-		nodeID: sha256.Sum224([]byte(nodeID)),
-	}, nil
+	address          *net.UDPAddr
+	nodeAddresses    []*net.UDPAddr
+	transport        *transport
+	connectionsLimit int
 }
 
 func (s *Server) Listen(nodeID string) (*Listener, error) {
@@ -38,38 +49,22 @@ func (s *Server) Listen(nodeID string) (*Listener, error) {
 	}, nil
 }
 
-// connectionsLimit default value 2000000 if 0, max value 1000000000
-func (s *Server) Run(connectionsLimit int) error {
-	if connectionsLimit <= 0 {
-		connectionsLimit = 2000000
-	}
-	if connectionsLimit > 1000000000 {
-		connectionsLimit = 1000000000
-	}
-
-	var err error
-	s.transport.conn, err = net.ListenUDP("udp", s.address)
-	if err != nil {
-		return err
-	}
-
+func (s *Server) process() {
 	in := make(chan *datagram)
-	go s.process(in, connectionsLimit)
+	go func() {
+		for {
+			i := &datagram{
+				b: make([]byte, 1432),
+			}
+			i.n, i.rAddr, i.err = s.transport.read(i.b)
+			if i.err != nil {
 
-	for {
-		i := &datagram{
-			b: make([]byte, 1432),
+				//continue
+			}
+			in <- i
 		}
-		i.n, i.rAddr, i.err = s.transport.read(i.b)
-		if i.err != nil {
+	}()
 
-			//continue
-		}
-		in <- i
-	}
-}
-
-func (s *Server) process(in chan *datagram, connectionsLimit int) {
 	memory := &memory.Memory[core]{}
 	drop := make(chan *core)
 	for {
@@ -81,7 +76,7 @@ func (s *Server) process(in chan *datagram, connectionsLimit int) {
 					current.inData <- cIDDatagram.datagram
 				}
 			} else {
-				if len(i.b) >= datagramMinLen && memory.Len() < connectionsLimit {
+				if len(i.b) >= datagramMinLen && memory.Len() < s.connectionsLimit {
 					privateKey, err := ecdh.X25519().GenerateKey(rand.Reader)
 					if err != nil {
 						continue
@@ -138,14 +133,6 @@ func (s *Server) process(in chan *datagram, connectionsLimit int) {
 }
 
 func (s *Server) Close() error {
-	return nil
-}
-
-type Handler struct {
-	nodeID [sha256.Size224]byte
-}
-
-func (h *Handler) Close() error {
 	return nil
 }
 

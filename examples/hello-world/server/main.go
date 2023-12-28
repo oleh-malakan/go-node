@@ -8,33 +8,41 @@ import (
 )
 
 func main() {
-	server, err := node.New(&net.UDPAddr{})
+	server, err := node.Run(0, &net.UDPAddr{})
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer server.Close()
 
-	_, err = server.Handler("Hello, World!", func(stream *node.Stream) {
-		b, err := stream.Receive()
-		if err != nil {
-			log.Print(err)
+	listener, err := server.Listen("Hello, World!")
+	if err != nil {
+		log.Print(err)
 
-			return
-		}
+		return
+	}
+	defer listener.Close()
 
-		message := string(b)
-		if message == "Hello" {
-			if err := stream.Send([]byte(message + ", World!")); err != nil {
-				log.Print(err)
+	stream, err := listener.Accept()
+	if err != nil {
+		log.Print(err)
 
-				return
-			}
-		}
-	})
+		return
+	}
+	defer stream.Close()
+
+	b, err := stream.Receive()
 	if err != nil {
 		log.Print(err)
 
 		return
 	}
 
-	log.Fatal(server.Run(0))
+	message := string(b)
+	if message == "Hello" {
+		if err := stream.Send([]byte(message + ", World!")); err != nil {
+			log.Print(err)
+
+			return
+		}
+	}
 }
