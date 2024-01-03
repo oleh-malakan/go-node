@@ -56,7 +56,7 @@ func (s *Server) process() {
 			i := &datagram{
 				b: make([]byte, 1432),
 			}
-			i.n, i.rAddr, i.err = s.transport.read(i.b)
+			i.n, i.rAddr, i.err = s.transport.readUDP(i.b)
 			if i.err != nil {
 
 				//continue
@@ -110,14 +110,13 @@ func (s *Server) process() {
 
 					new.cid = memory.Put(new)
 
-					b := make([]byte, datagramMinLen)
 					copy(b[1:33], privateKey.PublicKey().Bytes())
 					rand.Reader.Read(b[53:65])
 
 					binary.BigEndian.PutUint32(b[33:], uint32(new.cid))
 
 					new.cipher.Seal(b[:33], b[55:67], b[33:37], b[:33])
-					_, err = s.transport.write(b, i.rAddr)
+					_, err = s.transport.writeUDP(b, i.rAddr)
 					if err != nil {
 						memory.Free(new.cid)
 						continue

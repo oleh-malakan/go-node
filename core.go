@@ -88,10 +88,14 @@ type transport struct {
 	conn *net.UDPConn
 }
 
-func (t *transport) write(b []byte, addr *net.UDPAddr) (int, error) {
+func (t *transport) writeUDP(b []byte, addr *net.UDPAddr) (int, error) {
 	return t.conn.WriteToUDP(b, addr)
 }
 
-func (t *transport) read(b []byte) (int, *net.UDPAddr, error) {
+func (t *transport) readUDP(b []byte) (int, *net.UDPAddr, error) {
 	return t.conn.ReadFromUDP(b)
+}
+
+func (t *transport) read(b []byte) (int, error) {
+	return t.conn.Read(b)
 }
