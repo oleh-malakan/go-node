@@ -110,6 +110,7 @@ func (s *Server) process() {
 
 					new.cid = memory.Put(new)
 
+					b := make([]byte, datagramMinLen)
 					copy(b[1:33], privateKey.PublicKey().Bytes())
 					rand.Reader.Read(b[53:65])
 

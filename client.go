@@ -1,6 +1,8 @@
 package node
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/ecdh"
 	"crypto/rand"
 	"errors"
@@ -45,30 +47,54 @@ func (c *Client) process() {
 		conn: conn,
 	}
 
-	privateKey, err := ecdh.X25519().GenerateKey(rand.Reader)
-	if err != nil {
+	inData := make(chan *datagram)
 
-	}
+	go func() {
+		privateKey, err := ecdh.X25519().GenerateKey(rand.Reader)
+		if err != nil {
 
-	b := make([]byte, datagramMinLen)
-	copy(b[1:33], privateKey.PublicKey().Bytes())
+		}
 
-	_, err = c.transport.writeUDP(b, c.nodeAddresses[0])
-	if err != nil {
+		b := make([]byte, datagramMinLen)
+		copy(b[1:33], privateKey.PublicKey().Bytes())
 
-	}
+		_, err = c.transport.writeUDP(b, c.nodeAddresses[0])
+		if err != nil {
 
-	_, err = c.transport.read(b)
-	if err != nil {
+		}
 
-	}
+		for {
+			select {
+			case i := <-inData:
+				remotePublicKey, err := ecdh.X25519().NewPublicKey(i.b[1:33])
+				if err != nil {
+					continue
+				}
+				secret, err := privateKey.ECDH(remotePublicKey)
+				if err != nil {
+					continue
+				}
+				block, err := aes.NewCipher(secret)
+				if err != nil {
+					continue
+				}
+				cipher, err := cipher.NewGCM(block)
+				if err != nil {
+					continue
+				}
+				cipher.Open()
 
-	core := &core{
-		inData:    make(chan *datagram),
-		isProcess: true,
-	}
+				core := &core{
+					inData:    inData,
+					isProcess: true,
+					cipher:    cipher,
+				}
+				go core.process()
 
-	go core.process()
+				return
+			}
+		}
+	}()
 
 	for {
 		i := &datagram{
@@ -80,6 +106,6 @@ func (c *Client) process() {
 
 			//continue
 		}
-		core.inData <- i
+		inData <- i
 	}
 }
